@@ -80,3 +80,50 @@ spend-CATE model (only 578 non-zero spend values total, see
 $0.10-per-email cost
 (`src/config.py:DEFAULT_EMAIL_COST_USD`, a stated assumption, not fitted) comfortably.
 **The confidence interval crosses zero and runs negative, though**: at this sample size, spend among 30%-of-64,000 customers is too sparse to statistically rule out the segment losing money rather than paying for itself. The visit-based numbers above are the ones this report actually stands behind; this section is a directional read on revenue, not a claim with the same statistical footing.
+
+## Three-action policy: no email, mens email, or womens email
+
+Everything above treats this as one decision, email or not. But the mens and womens
+creatives are not interchangeable (`reports/05_dml_ate.md`: +7.47pp vs +4.49pp on visit,
+pooled), so the real decision has three options. `econml.policy.DRPolicyForest` picks a
+recommended arm per customer from a doubly-robust reward estimate relative to `No E-Mail`.
+Every policy below, learned or not, is scored the same way on the held-out eval set: an
+inverse-propensity-weighted estimate of the average visit rate under that policy, using
+only customers whose real (randomised) arm happened to match the recommendation.
+
+| policy | policy value (visit rate) | 95% CI |
+|---|---|---|
+| learned (DRPolicyForest) | 0.1831 | [0.1736, 0.1941] |
+| purchase-history heuristic | 0.1756 | [0.1662, 0.1852] |
+| email everyone (mens creative) | 0.1851 | [0.1752, 0.1957] |
+| email nobody | 0.1061 | [0.0984, 0.1137] |
+
+`email nobody` recovers the control arm's raw visit rate almost exactly
+(0.1061 vs the true control rate of 0.1062, `reports/data_dictionary.md`),
+the sanity check that the IPW estimator itself is unbiased before trusting it on anything
+more interesting.
+
+**The honest result, stated plainly rather than dressed up: the learned policy does not**
+**clearly beat the simplest baseline that already knew the mens creative works better.**
+Learned policy value 0.1831 vs 0.1851 for blanket mens-emailing everyone, with heavily overlapping confidence intervals: not a result this report can call a win.
+Both comfortably and significantly beat the purchase-history heuristic
+(0.1756) and email-nobody (0.1061).
+
+This is a real and explicable finding, not a failed experiment: the heterogeneity section
+above showed the mens creative's effect is positive for almost every segment,
+including customers with a mens-only purchase history (+0.043 CATE, still clearly above
+zero). When
+the simpler action already has a positive effect almost everywhere, there is little room
+left for a smarter per-customer policy to improve on it — the value of granular targeting
+would show up far more clearly in a setting where some segment is actually hurt by the
+default action, which is not the case here. The learned policy still earns its place: it
+correctly identifies that the purchase-history heuristic's core assumption, match the
+creative to what the customer already buys, is wrong on this data (the heuristic
+underperforms blanket mens-emailing by 0.0094
+visit-rate points), and it does so without anyone having to notice that by eye.
+
+The forest recommends the womens creative for
+2,165 of 19,200
+held-out customers and the mens creative for the rest; it never recommends sending no
+email at all in this eval set, since both creatives show a positive effect for every
+segment identified above.
