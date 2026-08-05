@@ -1,0 +1,44 @@
+"""Single source of truth for paths, seeds and modelling constants."""
+
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = ROOT / "data"
+REPORTS_DIR = ROOT / "reports"
+FIGURES_DIR = REPORTS_DIR / "figures"
+MODELS_DIR = ROOT / "models"
+
+HILLSTROM_URL = (
+    "http://www.minethatdata.com/"
+    "Kevin_Hillstrom_MineThatData_E-MailAnalytics_DataMiningChallenge_2008.03.20.csv"
+)
+RAW_CSV_PATH = DATA_DIR / "hillstrom.csv"
+
+RANDOM_SEED = 42
+
+ARM_COL = "segment"
+ARMS = ["No E-Mail", "Mens E-Mail", "Womens E-Mail"]
+CONTROL_ARM = "No E-Mail"
+TREATMENT_COL = "treatment"  # 1 if segment != CONTROL_ARM, 0 otherwise — built by data_loader
+
+OUTCOME_COLS = ["visit", "conversion", "spend"]
+
+NUMERIC_COVARIATES = ["recency", "history"]
+BINARY_COVARIATES = ["mens", "womens", "newbie"]
+CATEGORICAL_COVARIATES = ["zip_code", "channel"]
+COVARIATE_COLS = NUMERIC_COVARIATES + BINARY_COVARIATES + CATEGORICAL_COVARIATES
+
+# heterogeneity is only well-powered on visit (~9,000 events across 64,000 rows) — conversion and
+# spend have 578 non-zero outcomes total, so CATE work targets visit specifically; see
+# reports/data_dictionary.md for the power check this constant is based on.
+CATE_OUTCOME = "visit"
+
+# 70/30, stratified on arm and CATE_OUTCOME — every CATE/Qini number reported comes from the 30%
+# the forest never saw during fitting.
+TRAIN_FRACTION = 0.7
+EVAL_FRACTION = 0.3
+
+# per-contact email cost: a stated assumption, not a fitted value, because Hillstrom ships no cost
+# data. Configurable per call. reports/07_uplift_policy.md also reports the break-even cost at
+# which top-k targeting stops paying, which is derived from the data rather than assumed.
+DEFAULT_EMAIL_COST_USD = 0.10

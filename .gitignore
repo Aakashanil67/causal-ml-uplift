@@ -1,0 +1,40 @@
+# virtual environment
+.venv/
+venv/
+
+# data — never commit raw data
+data/
+*.csv
+
+# secrets
+.env
+*.env.local
+
+# model artifacts — except the small ones the simulator needs at deploy time
+mlruns/
+mlartifacts/
+*.pkl
+*.joblib
+!models/*.joblib
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# notebooks
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# editor
+.vscode/
+.claude/
+
+# personal planning docs, not part of the shipped project
+/*.pdf
+Project 2 - AUTOPILOT - Causal ML.md
