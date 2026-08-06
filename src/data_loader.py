@@ -15,6 +15,7 @@ from src.config import (
     ARMS,
     BINARY_COVARIATES,
     CATEGORICAL_COVARIATES,
+    CATEGORICAL_LEVELS,
     CONTROL_ARM,
     DATA_DIR,
     HILLSTROM_URL,
@@ -75,9 +76,17 @@ def load_hillstrom() -> pd.DataFrame:
 def build_covariate_matrix(df: pd.DataFrame) -> pd.DataFrame:
     """Numeric + binary covariates pass through; categoricals become one-hot dummies (first level
     dropped to avoid collinearity in the linear/logit stages — the tree-based estimators don't
-    need the drop but tolerate it fine)."""
+    need the drop but tolerate it fine).
+
+    Categoricals are cast to `CATEGORICAL_LEVELS`' fixed category lists before dummying, not left
+    to whatever values happen to appear in `df`: a single-row prediction request only ever has one
+    `zip_code` value, and without a fixed category set `get_dummies` would silently produce a
+    different (too-narrow) column set than the one the model was trained on."""
     numeric = df[NUMERIC_COVARIATES + BINARY_COVARIATES].astype(float)
-    dummies = pd.get_dummies(df[CATEGORICAL_COVARIATES], drop_first=True, dtype=float)
+    categorical = df[CATEGORICAL_COVARIATES].copy()
+    for col, levels in CATEGORICAL_LEVELS.items():
+        categorical[col] = pd.Categorical(categorical[col], categories=levels)
+    dummies = pd.get_dummies(categorical, drop_first=True, dtype=float)
     return pd.concat([numeric, dummies], axis=1)
 
 

@@ -28,6 +28,15 @@ BINARY_COVARIATES = ["mens", "womens", "newbie"]
 CATEGORICAL_COVARIATES = ["zip_code", "channel"]
 COVARIATE_COLS = NUMERIC_COVARIATES + BINARY_COVARIATES + CATEGORICAL_COVARIATES
 
+# fixed, exhaustive category lists — build_covariate_matrix() uses these (not whatever categories
+# happen to appear in a given input) so a single-row inference request produces the same columns
+# as a full-dataset fit; without this, get_dummies() on a subset missing a category silently drops
+# that dummy column instead of erroring, which only surfaces at serving time (see src/persist.py).
+CATEGORICAL_LEVELS = {
+    "zip_code": ["Rural", "Surburban", "Urban"],
+    "channel": ["Multichannel", "Phone", "Web"],
+}
+
 # heterogeneity is only well-powered on visit (~9,000 events across 64,000 rows) — conversion and
 # spend have 578 non-zero outcomes total, so CATE work targets visit specifically; see
 # reports/data_dictionary.md for the power check this constant is based on.

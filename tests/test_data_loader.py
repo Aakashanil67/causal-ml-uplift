@@ -94,3 +94,12 @@ def test_covariate_matrix_shape_and_dtype(df):
     # one-hot dummies drop the first level: 3 zip codes -> 2 columns, 3 channels -> 2 columns
     assert "zip_code_Surburban" in X.columns
     assert "zip_code_Rural" not in X.columns  # dropped as the reference level
+
+
+def test_covariate_matrix_columns_stable_on_a_single_row(df):
+    # regression test for a real bug: a single-row input only has one zip_code/channel value, and
+    # without a fixed category list get_dummies() silently produces fewer columns than a full-batch
+    # fit does, misaligning every downstream model at serving time (src/persist.py, app/simulator.py).
+    full = build_covariate_matrix(df)
+    single = build_covariate_matrix(df.iloc[[0]])
+    assert list(single.columns) == list(full.columns)
