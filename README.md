@@ -5,7 +5,7 @@
 
 Who does a marketing email actually persuade, on a real randomised experiment: DoWhy identification, EconML Double ML and causal forests, validated against a constructed confounding benchmark, refutation-tested, and shipped as an interactive what-if simulator.
 
-**[Full report (PDF)](reports/causal_report.pdf)** · live simulator: not yet deployed, see Status below · Hillstrom e-mail experiment, 64,000 customers, three arms.
+**[Full report (PDF)](reports/causal_report.pdf)** · **[live simulator](https://causal-ml-uplift.streamlit.app/)** · Hillstrom e-mail experiment, 64,000 customers, three arms.
 
 ![causal graph](reports/figures/dag.png)
 
@@ -86,9 +86,8 @@ Tests: `pytest -v` (79 tests; one marked `slow`, a full Streamlit `AppTest` run 
 
 ## Status
 
-Built and tested end to end: data loader through refutations, a Streamlit simulator tested in a real browser (three real bugs found and fixed there, not just imported and assumed working — see `CLAUDE.md`), a rendered PDF report opened and paged through, and CI green on GitHub, not just passing locally. What's not done:
+Built and tested end to end: data loader through refutations, a Streamlit simulator tested in a real browser (three real bugs found and fixed there, not just imported and assumed working — see `CLAUDE.md`), a rendered PDF report opened and paged through, CI green on GitHub, not just passing locally, and the [live deployment](https://causal-ml-uplift.streamlit.app/) itself checked in a real browser after connecting — both tabs, the Qini curve, and the three-arm policy table all confirmed rendering correctly in production. What's not done:
 
-- **No live deployment yet.** Streamlit Community Cloud configuration is ready (`app/requirements.txt`, this section); connecting the repo is a manual step still to do.
 - **The learned three-arm policy's advantage over "email everyone the stronger creative" is not statistically established** on this eval set. A larger sample, or a campaign with genuine segment-level harm from the default action, would show the value of granular targeting more clearly than this data can.
 - **The revenue-based targeting claim is underpowered** (578 non-zero spend values total): the point estimate clears the assumed per-email cost, but the confidence interval crosses zero. The report leads with the visit-based numbers, which are precise, and says this plainly rather than rounding the wide interval away.
 - **One campaign, one retailer, US, March 2008.** The method generalises; the +6pp does not. `reports/causal_report.md` has a section on what would and would not transfer to a South African retention campaign.
