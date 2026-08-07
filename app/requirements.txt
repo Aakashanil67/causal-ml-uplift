@@ -1,0 +1,17 @@
+# Streamlit Community Cloud reads a requirements.txt from the app's own directory before falling
+# back to the repo root — this is that file. A subset of the root requirements.txt: only what
+# app/simulator.py's import chain (src.cate, src.persist, src.policy, src.uplift, src.data_loader,
+# src.config) actually needs at runtime. `dowhy`, `statsmodels`, `networkx`, `markdown` and the
+# dev-only tools (pytest, ruff, ipykernel, nbconvert) are used by src.identify/src.confounded/
+# src.refute/src.regression_baseline/src.dag/src.render_report and the notebook, none of which the
+# app imports, so they're left out on purpose rather than dragged along.
+numpy==1.26.4
+scipy==1.13.1
+scikit-learn==1.5.2
+pandas==2.2.3
+econml==0.16.0
+lightgbm==4.7.0
+matplotlib==3.11.1
+streamlit==1.61.0
+starlette==0.52.1
+joblib==1.5.3
