@@ -1,6 +1,9 @@
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+markers = [
+    "slow: exercises a full model fit end to end (deselect with -m 'not slow' for a fast run)",
+]
 
 [tool.ruff]
 line-length = 100
