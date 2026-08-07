@@ -106,6 +106,37 @@ def bootstrap_gain_per_target_ci(
     return float(np.percentile(estimates, 2.5)), float(np.percentile(estimates, 97.5))
 
 
+def plot_qini_curve(curve: pd.DataFrame, qini_coef: float, out_path) -> None:
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(7, 4.5))
+    ax.plot(
+        curve["k_frac"] * 100,
+        curve["gain"],
+        color="#5b7fb5",
+        linewidth=1.8,
+        label="ranked by predicted uplift",
+    )
+    ax.plot(
+        curve["k_frac"] * 100,
+        curve["random_line"],
+        color="#9aa5b1",
+        linestyle="--",
+        label="random targeting",
+    )
+    ax.fill_between(
+        curve["k_frac"] * 100, curve["gain"], curve["random_line"], alpha=0.15, color="#5b7fb5"
+    )
+    ax.set_xlabel("% of customers targeted (top-k by predicted uplift)")
+    ax.set_ylabel("cumulative incremental visits")
+    ax.set_title(f"Qini curve (coefficient: {qini_coef:.2f})")
+    ax.legend(fontsize=9)
+    fig.tight_layout()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+
+
 def write_uplift_report(
     cate_stats: dict,
     purchase_table: pd.DataFrame,
@@ -241,6 +272,10 @@ def main() -> None:
     curve = qini_curve(cate, T, Y_visit)
     qini_coef = qini_coefficient(curve)
     print(f"Qini coefficient: {qini_coef:.2f}")
+
+    from src.config import FIGURES_DIR
+
+    plot_qini_curve(curve, qini_coef, FIGURES_DIR / "qini_curve.png")
 
     ks = [0.1, 0.2, 0.3, 0.5, 1.0]
     rows = []
