@@ -1,9 +1,17 @@
 import pytest
 
-from src.render_report import render_pdf
+from src.render_report import find_chrome, render_pdf
 
 
 def test_render_pdf_produces_a_real_pdf(tmp_path):
+    # CHROME_CANDIDATES is a Windows-path list (this project's dev machine); on a CI runner
+    # without one of those paths or a `chrome`/`google-chrome` on PATH, skip rather than fail —
+    # the actual PDF-rendering logic still gets exercised locally and wherever Chrome exists.
+    try:
+        find_chrome()
+    except FileNotFoundError:
+        pytest.skip("no Chrome executable available in this environment")
+
     md_path = tmp_path / "tiny_report.md"
     md_path.write_text(
         "# Title\n\nSome **content** with a table.\n\n| a | b |\n|---|---|\n| 1 | 2 |\n",

@@ -54,3 +54,16 @@ def test_predict_ignores_extra_profile_keys(small_model):
     extra = {**VALID_PROFILE, "customer_id": 12345}
     result = predict_cate_for_profile(small_model, extra)
     assert np.isfinite(result["cate"])
+
+
+def test_committed_model_artifact_is_under_the_surrogate_threshold():
+    # this project's own decision (CLAUDE.md, 2026-08-05): ship the real CausalForestDML if it
+    # stays under 50MB, distill a LightGBM surrogate instead if it doesn't. If a future change
+    # (more estimators, more covariates) pushes the committed artifact over that line, this should
+    # fail loudly rather than someone noticing a slow git push or a Streamlit Cloud memory error.
+    from src.persist import MODEL_PATH
+
+    if not MODEL_PATH.exists():
+        pytest.skip("models/causal_forest.joblib not present in this checkout")
+    size_mb = MODEL_PATH.stat().st_size / 1e6
+    assert size_mb < 50, f"{MODEL_PATH} is {size_mb:.1f}MB, over the 50MB surrogate threshold"

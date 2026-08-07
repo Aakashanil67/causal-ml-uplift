@@ -24,6 +24,26 @@ def test_qini_curve_matches_hand_computed_gain():
     assert curve["n_targeted"].tolist() == [1, 2, 3, 4, 5, 6]
 
 
+def test_qini_curve_no_treated_units_does_not_crash():
+    # every unit control: no ratio can ever be computed (cum_nt stays 0), gain should just sit
+    # at 0 throughout rather than raising a division error.
+    T = np.zeros(5)
+    Y = np.array([1, 0, 1, 0, 1], dtype=float)
+    scores = np.array([5.0, 4.0, 3.0, 2.0, 1.0])
+    curve = qini_curve(scores, T, Y)
+    assert (curve["gain"] == 0).all()
+
+
+def test_qini_curve_no_control_units_falls_back_to_raw_treated_sum():
+    # every unit treated: no control ever appears, so the ratio guard should never fire and gain
+    # should equal the raw cumulative treated outcome sum (the documented fallback).
+    T = np.ones(5)
+    Y = np.array([1, 0, 1, 0, 1], dtype=float)
+    scores = np.array([5.0, 4.0, 3.0, 2.0, 1.0])
+    curve = qini_curve(scores, T, Y)
+    assert curve["gain"].tolist() == np.cumsum(Y).tolist()
+
+
 def test_qini_random_line_ends_at_total_gain():
     curve = qini_curve(FIXTURE_SCORES, FIXTURE_T, FIXTURE_Y)
     # by construction, the random line must meet the model curve exactly at k=1
