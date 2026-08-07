@@ -31,7 +31,12 @@ def test_render_pdf_produces_a_real_pdf(tmp_path):
 def test_render_pdf_raises_clearly_if_chrome_is_missing(tmp_path, monkeypatch):
     import src.render_report as render_report
 
+    # a real bug in the first version of this test: it only patched CHROME_CANDIDATES, but
+    # find_chrome()'s PATH fallback (shutil.which) finds the real system Chrome on any machine
+    # that has one on PATH — including GitHub's ubuntu-latest runners — so the "missing" case
+    # was never actually exercised there. shutil.which has to be patched too.
     monkeypatch.setattr(render_report, "CHROME_CANDIDATES", ["Z:\\nonexistent\\chrome.exe"])
+    monkeypatch.setattr(render_report.shutil, "which", lambda _name: None)
     md_path = tmp_path / "report.md"
     md_path.write_text("# Title\n", encoding="utf-8")
 
