@@ -1,7 +1,7 @@
 """Renders `reports/causal_report.md` to PDF via headless Chrome.
 
 `weasyprint` fails to import on this machine (`OSError: cannot load library 'libgobject-2.0-0'`,
-needs a GTK/Pango runtime not installed here — see `CLAUDE.md`). Chrome's own
+needs a GTK/Pango runtime not installed here). Chrome's own
 `--headless --print-to-pdf` needs no extra system install and was verified working before
 committing to the approach, so the path here is markdown -> styled HTML -> Chrome print, not a
 PDF library.
