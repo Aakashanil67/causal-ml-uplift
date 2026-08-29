@@ -35,6 +35,9 @@ Thumbs.db
 .vscode/
 .claude/
 
+# local isolated worktrees
+.worktrees/
+
 # personal planning docs, not part of the shipped project
 /*.pdf
 Project 2 - AUTOPILOT - Causal ML.md
