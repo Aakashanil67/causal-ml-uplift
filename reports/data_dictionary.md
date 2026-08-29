@@ -51,15 +51,15 @@ as "bought while there." `src/data_loader.load_hillstrom()` asserts this on ever
 downstream design choices depend on it: treating `visit` as the well-powered outcome for
 heterogeneity work, and treating `conversion`/`spend` as the same underlying rare event.
 
-**`spend` is right-censored at exactly $499.00.** Twelve customers show `spend == 499.00` to the
+**`spend` may be top-coded at exactly $499.00.** Twelve customers show `spend == 499.00` to the
 cent, and no customer shows anything between $482.31 (the next-highest value) and $499.00. That is
 a gap, not a coincidence. Those twelve span very different purchase histories ($29.99 to $1,515.82), so
 this is not twelve customers independently buying the same $499 item; it reads as a hard cap
 applied when MineThatData published the file, most likely to suppress outliers or protect
 high-value customers from re-identification. Whatever the reason, every spend-based estimate in
-this project (the OLS and DML results on `spend`) is a **lower bound** on the true effect, not an
-unbiased estimate, and the report says so rather than treating $499.00 as a real ceiling on how
-much these customers spent.
+this project (the OLS and DML results on observed `spend`) estimates the effect on the reported,
+capped outcome. The uncapped-spend effect is not identified without an explicit model of the cap,
+so it should not be called a lower bound.
 
 ## Statistical power, and why heterogeneity work targets `visit`
 
@@ -72,7 +72,8 @@ much these customers spent.
 `conversion` and `spend` are the same 578 customers (spend is non-zero exactly when conversion is
 1, checked directly, zero exceptions either direction). Splitting 578 events across a `CausalForestDML`
 with dozens of leaves produces a CATE surface with almost no signal per leaf. Average treatment
-effects with confidence intervals are reported for all three outcomes; individual treatment effects
+effects with confidence intervals are reported for all three outcomes; profile-level conditional
+average effects
 (`src/cate.py` onward) are estimated on `visit` only, and the report states this rather than showing
 a heterogeneity plot for conversion that would be mostly noise.
 

@@ -1,4 +1,4 @@
-# Validating DML against a known truth: the confounding benchmark
+# Constructed confounding stress test
 
 Every method so far agreed because Hillstrom is randomised and there was nothing to
 disagree about. This section manufactures real confounding from the same data and checks

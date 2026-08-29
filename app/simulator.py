@@ -44,7 +44,7 @@ from src.policy import (
     ipw_policy_value,
     policy_forest_recommendations,
 )
-from src.uplift import gain_per_target_at_k, qini_curve
+from src.uplift import qini_curve, uplift_per_email_at_k
 
 st.set_page_config(page_title="Causal ML Uplift Simulator", layout="wide")
 
@@ -118,12 +118,17 @@ def plot_cate_gauge(customer_cate: float, eval_cate: np.ndarray):
 
 
 def render_profile_tab():
-    st.subheader("Estimated treatment effect for one customer")
+    st.subheader("Estimated conditional average effect for a customer profile")
     st.caption(
-        "Predicts the effect of sending this customer any email (mens or womens) on their "
-        "probability of visiting the site, from the production `CausalForestDML` model."
+        "Estimates the average effect for customers with this profile of assignment to the pooled "
+        "email mixture versus no email; it is not an individual-level causal guarantee."
     )
     profile = profile_form()
+    if not (profile["mens"] or profile["womens"]):
+        st.warning(
+            "This profile has no recorded product category. It is outside the observed purchase-history "
+            "segments used in the main interpretation, so treat its estimate as extrapolative."
+        )
     model = get_production_model()
     result = predict_cate_for_profile(model, profile)
 
@@ -134,13 +139,15 @@ def render_profile_tab():
 
     if result["ci_low"] > 0:
         st.success(
-            "This customer's confidence interval is entirely positive: the email likely helps."
+            "This profile's conditional-average interval is entirely positive in this model."
         )
     elif result["ci_high"] < 0:
-        st.warning("This customer's confidence interval is entirely negative: the email may hurt.")
+        st.warning(
+            "This profile's conditional-average interval is entirely negative in this model."
+        )
     else:
         st.info(
-            "This customer's confidence interval includes zero: not distinguishable from no effect."
+            "This profile's conditional-average interval includes zero: not distinguishable from no effect."
         )
 
     _eval_df, eval_cate = get_eval_artifacts()
@@ -153,7 +160,11 @@ def render_profile_tab():
 
 
 def render_policy_tab():
-    st.subheader("Targeting policy: email the top X% by predicted uplift")
+    st.subheader("Pooled-email mixture targeting diagnostic")
+    st.caption(
+        "This ranking evaluates assignment to the historical mens/womens email mixture versus no "
+        "email. Use the three-action policy comparison below for a creative-specific action."
+    )
     eval_df, eval_cate = get_eval_artifacts()
     T = eval_df[TREATMENT_COL].to_numpy()
     Y = eval_df["visit"].to_numpy(dtype=float)
@@ -162,12 +173,12 @@ def render_policy_tab():
     pct = st.slider("Target the top X% of customers by predicted uplift", 1, 100, 30)
     k = pct / 100
     n_targeted = int(n * k)
-    gain_per_target = gain_per_target_at_k(eval_cate, T, Y, k)
-    total_incremental_visits = gain_per_target * n_targeted
+    uplift_per_email = uplift_per_email_at_k(eval_cate, T, Y, k)
+    total_incremental_visits = uplift_per_email * n_targeted
 
     m1, m2, m3 = st.columns(3)
     m1.metric("Customers targeted", f"{n_targeted:,} / {n:,}")
-    m2.metric("Incremental visits per customer emailed", f"{gain_per_target:+.4f}")
+    m2.metric("Incremental visits per customer emailed", f"{uplift_per_email:+.4f}")
     m3.metric("Total incremental visits (this eval set)", f"{total_incremental_visits:+.1f}")
 
     curve = qini_curve(eval_cate, T, Y)

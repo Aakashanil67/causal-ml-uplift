@@ -2,11 +2,11 @@ import numpy as np
 import pytest
 
 from src.uplift import (
-    bootstrap_gain_per_target_ci,
-    gain_per_target_at_k,
+    bootstrap_uplift_per_email_ci,
     qini_coefficient,
     qini_curve,
     uplift_deciles,
+    uplift_per_email_at_k,
 )
 
 # hand-worked fixture, verified by computing each cumulative step manually (see build notes):
@@ -118,14 +118,27 @@ def test_uplift_deciles_top_beats_bottom_on_a_clean_synthetic_signal():
     assert deciles["n"].sum() == n
 
 
-def test_gain_per_target_at_k_matches_manual_slice():
-    gpt = gain_per_target_at_k(FIXTURE_SCORES, FIXTURE_T, FIXTURE_Y, k=0.5)
-    # k=0.5 of 6 units -> top 3, expected gain there is 2.0 (index 2), gain/n_targeted = 2/3
-    assert gpt == pytest.approx(2.0 / 3.0)
+def test_uplift_per_email_at_k_matches_manual_slice():
+    uplift = uplift_per_email_at_k(FIXTURE_SCORES, FIXTURE_T, FIXTURE_Y, k=0.5)
+    # k=0.5 of 6 units -> top 3: treated mean is 1.0 and control mean is 0.0.
+    # The counterfactual policy emails all three customers, so its per-email effect is 1.0;
+    # dividing Qini gain by all ranked rows (2/3) is not the same estimand.
+    assert uplift == pytest.approx(1.0)
 
 
-def test_bootstrap_ci_contains_point_estimate_and_is_ordered():
-    ci_low, ci_high = bootstrap_gain_per_target_ci(
+@pytest.mark.parametrize("k", [0.0, -0.1, 1.1])
+def test_uplift_per_email_at_k_rejects_invalid_targeting_fraction(k):
+    with pytest.raises(ValueError, match="k"):
+        uplift_per_email_at_k(FIXTURE_SCORES, FIXTURE_T, FIXTURE_Y, k=k)
+
+
+def test_uplift_per_email_at_k_requires_both_arms_in_selected_slice():
+    with pytest.raises(ValueError, match="treated and control"):
+        uplift_per_email_at_k(FIXTURE_SCORES, FIXTURE_T, FIXTURE_Y, k=1 / 6)
+
+
+def test_bootstrap_uplift_per_email_ci_is_ordered():
+    ci_low, ci_high = bootstrap_uplift_per_email_ci(
         FIXTURE_SCORES, FIXTURE_T, FIXTURE_Y, k=0.5, n_boot=200, seed=0
     )
     assert ci_low <= ci_high

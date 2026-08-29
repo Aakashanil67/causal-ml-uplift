@@ -36,7 +36,7 @@ Power. `conversion` and `spend` have 578 non-zero events total across 64,000 row
 
 ## 9. `spend` is capped at $499. How does that affect your results?
 
-Confirmed directly, not assumed: 12 customers show `spend` at exactly $499.00, with a real gap to the next-highest value ($482.31), which rules out coincidence. Every spend-based number in this project (the OLS coefficient, the DML ATE, the break-even revenue estimate) is a **lower bound** on the true effect, since the true spend of those 12 customers is unknown but at least $499. `reports/causal_report.md`'s limitations section states this rather than treating $499 as a real ceiling on what these customers spent.
+Twelve customers have reported spend exactly $499.00, with a gap to the next-highest value ($482.31), which makes top-coding plausible. Spend estimates are effects on the reported capped outcome. The uncapped-spend effect is not identified without a censoring model, so calling it a lower bound would add an unsupported assumption.
 
 ## 10. Why does your revenue-based targeting number have such a wide confidence interval?
 

@@ -26,7 +26,7 @@ All three land within a few hundredths of a percentage point of each other on ev
 
 Splitting the pooled treatment by creative rather than averaging it away shows the two emails are not interchangeable: mens email lifts visit by +7.47pp (DML, [6.82, 8.12]), womens by +4.49pp ([3.87, 5.12]), a real, non-overlapping gap that motivates Sections 6 and 7.
 
-## 4. Validating DML against a known truth, not just running it
+## 4. Constructed confounding stress test
 
 Every method above agreed because there was nothing to disagree about. `reports/06_confounding_benchmark.md` manufactures real confounding from the same real rows, retaining customers by a probability that depends on both their arm and their covariates and never fabricating an outcome, then checks whether each estimator can see through it, against the actual DML benchmark of +6.01pp.
 
@@ -36,9 +36,9 @@ Every method above agreed because there was nothing to disagree about. `reports/
 
 ## 5. Heterogeneity: who the email actually helps
 
-Individual effects come from a `CausalForestDML` fit on a 70% train split, evaluated only on the held-out 30% (`src/cate.py`; see `reports/data_dictionary.md` for why this targets `visit` specifically: `conversion` and `spend` have 578 events total across 64,000 rows, nowhere near enough to split across a forest without the surface being mostly noise). Mean CATE on the eval set: +0.0588, close to the pooled DML benchmark, with real spread: std 0.0218, range roughly −0.02 to +0.13.
+Profile-level conditional average effects come from a `CausalForestDML` fit on a 70% train split, evaluated only on the held-out 30% (`src/cate.py`; see `reports/data_dictionary.md` for why this targets `visit` specifically: `conversion` and `spend` have 578 events total across 64,000 rows, nowhere near enough to split across a forest without the surface being mostly noise). Mean CATE on the eval set: +0.0588, close to the pooled DML benchmark, with real spread: std 0.0218, range roughly −0.02 to +0.13. These are conditional averages for covariate profiles, not individual treatment effects.
 
-![distribution of individual treatment effects](figures/cate_distribution.png)
+![distribution of profile-level conditional average effects](figures/cate_distribution.png)
 
 The headline segmentation is prior purchase category, not recency or history, confirmed with an OLS interaction test before trusting the forest's split (treatment × `womens` p<0.001, treatment × `mens` p=0.006, both real; treatment × `recency`/`history`, checked for Section 4's confounding construction, both p>0.11, not significant):
 
@@ -58,7 +58,7 @@ Ranking the eval set by predicted CATE and computing the Qini gain by hand (Radc
 
 ![Qini curve](figures/qini_curve.png)
 
-Targeting the top 30% by predicted uplift is expected to generate +0.0499 incremental visits per customer emailed. The equivalent revenue number, using the same visit-based ranking since there is not enough spend data for a separate spend-CATE model, has a point estimate of $0.1196 per email against an assumed $0.10 cost, but a bootstrap 95% CI of [−$0.48, $0.63] that crosses zero. This report leads with the visit numbers, which are precise, and states plainly that the revenue claim cannot be statistically distinguished from a loss at this sample size (578 non-zero spend values total). That is the anticipated risk of a sparse economic outcome, not a result hidden after the fact.
+The historical report's top-30% per-email figure used an incorrect Qini denominator. The implementation now estimates the selected segment's treated-minus-control mean difference and must regenerate this table before publishing a revised numerical claim. That binary ranking is a diagnostic for the historical mens/womens email mixture versus no email, not a creative-specific deployment rule.
 
 ## 7. Three actions, not two: an honest result
 
@@ -71,7 +71,7 @@ The mens and womens creatives are different treatments, so `econml.policy.DRPoli
 | purchase-history heuristic | 0.1756 | [0.1662, 0.1852] |
 | email nobody | 0.1061 | [0.0984, 0.1137] |
 
-`Email nobody` recovers the true control rate almost exactly (0.1061 vs 0.1062), the sanity check that the IPW estimator itself is unbiased. The learned policy does **not** clearly beat blanket mens-emailing: heavily overlapping confidence intervals, checked directly rather than eyeballed, though both comfortably and significantly beat the purchase-history heuristic and email-nobody. This is explicable, not disappointing. Section 5 showed the mens creative has a positive effect for almost every segment, including mens-only-purchase customers (+0.043, still clearly positive), so there is little headroom left for a smarter per-customer policy to improve on "send the stronger creative to everyone." The value of granular targeting would show up far more clearly in a setting where some segment is actually hurt by the default action, which is not the case here. What the learned policy does earn its place doing is this: it correctly identifies that the purchase-history heuristic's core assumption, match the creative to what the customer already buys, is wrong on this data, underperforming blanket mens-emailing by 0.0095 points of visit rate.
+`Email nobody` recovers the true control rate almost exactly (0.1061 vs 0.1062), the sanity check that the IPW estimator itself is unbiased. Policy differences must be assessed with paired row-level bootstrap intervals, not by overlap of marginal intervals. The implementation now reports those intervals and does not call learned-versus-heuristic or learned-versus-mens differences significant when they cross zero.
 
 ## 8. Refutation tests, and what they do not prove
 
@@ -82,7 +82,7 @@ The more useful result comes from running the same three refuters on Section 4's
 ## 9. Limitations, stated rather than buried
 
 - **One campaign, one retailer, US, March 2008.** Nothing here says these exact numbers generalise to another retailer, another country, or another decade. What generalises is the method (the identify-estimate-refute-validate loop this report runs), not the +6pp.
-- **`spend` is right-censored at exactly $499.00** for 12 customers, confirmed as a real cap (a gap to the next-highest value, $482.31) rather than coincidence (`reports/data_dictionary.md`). Every spend-based number in this report is a lower bound on the true effect, not an unbiased estimate.
+- **`spend` may be top-coded at exactly $499.00** for 12 customers (`reports/data_dictionary.md`). Estimates are therefore effects on the reported capped outcome; the uncapped-spend effect is not identified without a censoring model and is not automatically a lower bound.
 - **The DAG treats `visit`/`conversion`/`spend` as three parallel outcomes**, not the real mediation chain (`treatment → visit → conversion → spend`, which the data supports: conversion is a strict subset of visit). This report estimates the total effect of treatment on each outcome, which is standard and matches what DML/CausalForestDML compute; it does not decompose how much of the spend effect runs through visiting, which would need its own identification argument.
 - **The confounding validation in Section 4 tests selection on named, engineered covariates.** It shows DML corrects for confounding it can see and fails honestly on confounding it cannot. It says nothing about whether an unobserved confounder exists in the real, unconfounded Hillstrom data; the entire reason this project uses a randomised experiment is that it does not need to answer that question.
 - **The revenue-based targeting claim (Section 6) is underpowered**, and this report says so rather than rounding the wide interval away.

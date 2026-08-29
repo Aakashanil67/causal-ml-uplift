@@ -68,11 +68,18 @@ def heuristic_recommendations(df: pd.DataFrame) -> np.ndarray:
 def ipw_policy_value(
     df: pd.DataFrame, recommended_arm: np.ndarray, outcome_col: str, propensities: dict
 ) -> float:
+    return float(policy_value_contributions(df, recommended_arm, outcome_col, propensities).mean())
+
+
+def policy_value_contributions(
+    df: pd.DataFrame, recommended_arm: np.ndarray, outcome_col: str, propensities: dict
+) -> np.ndarray:
+    """Return one Horvitz--Thompson contribution per row for a fixed policy."""
     actual_arm = df[ARM_COL].to_numpy()
     Y = df[outcome_col].to_numpy(dtype=float)
     matched = actual_arm == recommended_arm
     p = np.array([propensities[a] for a in actual_arm])
-    return float(np.sum(matched * Y / p) / len(df))
+    return matched * Y / p
 
 
 def bootstrap_policy_value_ci(
@@ -95,12 +102,40 @@ def bootstrap_policy_value_ci(
     return float(np.percentile(estimates, 2.5)), float(np.percentile(estimates, 97.5))
 
 
+def bootstrap_policy_difference_ci(
+    df: pd.DataFrame,
+    recommended_arm_a: np.ndarray,
+    recommended_arm_b: np.ndarray,
+    outcome_col: str,
+    propensities: dict,
+    n_boot: int = 1000,
+    seed: int = 0,
+) -> tuple[float, float, float]:
+    """Paired bootstrap interval for policy A minus policy B.
+
+    Resampling row-level contribution differences preserves their covariance. Marginal confidence
+    intervals, whether they overlap or not, cannot answer this comparison.
+    """
+    a = policy_value_contributions(df, recommended_arm_a, outcome_col, propensities)
+    b = policy_value_contributions(df, recommended_arm_b, outcome_col, propensities)
+    differences = a - b
+    rng = np.random.default_rng(seed)
+    indices = rng.integers(0, len(differences), size=(n_boot, len(differences)))
+    estimates = differences[indices].mean(axis=1)
+    return (
+        float(differences.mean()),
+        float(np.percentile(estimates, 2.5)),
+        float(np.percentile(estimates, 97.5)),
+    )
+
+
 def _cis_overlap(row_a: pd.Series, row_b: pd.Series) -> bool:
+    """Describe interval overlap only; never use it as a test of a policy difference."""
     return row_a["ci_low"] <= row_b["ci_high"] and row_b["ci_low"] <= row_a["ci_high"]
 
 
 def append_policy_section(
-    policy_values: pd.DataFrame, recommendation_counts: dict, out_path
+    policy_values: pd.DataFrame, comparisons: pd.DataFrame, recommendation_counts: dict, out_path
 ) -> None:
     learned = policy_values.loc["learned (DRPolicyForest)"]
     mens_blanket = policy_values.loc["email everyone (mens creative)"]
@@ -129,6 +164,15 @@ def append_policy_section(
         )
     lines += [
         "",
+        "| paired comparison (A - B) | difference | 95% CI |",
+        "|---|---:|---|",
+    ]
+    for label, row in comparisons.iterrows():
+        lines.append(
+            f"| {label} | {row['difference']:+.4f} | [{row['ci_low']:+.4f}, {row['ci_high']:+.4f}] |"
+        )
+    lines += [
+        "",
         "`email nobody` recovers the control arm's raw visit rate almost exactly",
         f"({none['value']:.4f} vs the true control rate of 0.1062, `reports/data_dictionary.md`),",
         "the sanity check that the IPW estimator itself is unbiased before trusting it on anything",
@@ -150,8 +194,8 @@ def append_policy_section(
         "**The honest result, stated plainly rather than dressed up: the learned policy does not**",
         "**clearly beat the simplest baseline that already knew the mens creative works better.**",
         comparison_sentence,
-        "Both comfortably and significantly beat the purchase-history heuristic",
-        f"({heuristic['value']:.4f}) and email-nobody ({none['value']:.4f}).",
+        "The paired-comparison table below, rather than these marginal intervals, determines",
+        "which policy differences this evaluation can support.",
         "",
         "This is a real and explicable finding, not a failed experiment: the heterogeneity section",
         "above showed the mens creative's effect is positive for almost every segment,",
@@ -207,10 +251,26 @@ def main() -> None:
         print(f"{name}: {value:.4f} [{ci_low:.4f}, {ci_high:.4f}]")
     policy_values = pd.DataFrame(rows).set_index("policy")
 
+    comparison_rows = []
+    for label, rec_a, rec_b in [
+        ("learned - blanket mens", learned_rec, mens_rec),
+        ("learned - purchase-history heuristic", learned_rec, heuristic_rec),
+        ("learned - email nobody", learned_rec, none_rec),
+    ]:
+        difference, ci_low, ci_high = bootstrap_policy_difference_ci(
+            eval_df, rec_a, rec_b, "visit", propensities
+        )
+        comparison_rows.append(
+            {"comparison": label, "difference": difference, "ci_low": ci_low, "ci_high": ci_high}
+        )
+    comparisons = pd.DataFrame(comparison_rows).set_index("comparison")
+
     rec_counts = pd.Series(learned_rec).value_counts().to_dict()
     print(rec_counts)
 
-    append_policy_section(policy_values, rec_counts, REPORTS_DIR / "07_uplift_policy.md")
+    append_policy_section(
+        policy_values, comparisons, rec_counts, REPORTS_DIR / "07_uplift_policy.md"
+    )
 
 
 if __name__ == "__main__":

@@ -4,10 +4,11 @@ import pytest
 
 from src.config import ARM_COL, CONTROL_ARM
 from src.policy import (
-    _cis_overlap,
     _treatment_name_to_arm,
+    bootstrap_policy_difference_ci,
     heuristic_recommendations,
     ipw_policy_value,
+    policy_value_contributions,
 )
 
 
@@ -55,12 +56,27 @@ def test_ipw_policy_value_on_real_data_matches_control_arm_rate():
     assert value == pytest.approx(0.106167, abs=0.01)
 
 
-def test_cis_overlap():
-    a = pd.Series({"ci_low": 0.1, "ci_high": 0.3})
-    b = pd.Series({"ci_low": 0.2, "ci_high": 0.4})
-    c = pd.Series({"ci_low": 0.5, "ci_high": 0.6})
-    assert _cis_overlap(a, b)
-    assert not _cis_overlap(a, c)
+def test_policy_value_contributions_average_to_the_ipw_value():
+    df = pd.DataFrame(
+        {ARM_COL: ["No E-Mail", "Mens E-Mail", "Womens E-Mail"], "visit": [0.0, 1.0, 1.0]}
+    )
+    propensities = {"No E-Mail": 1 / 3, "Mens E-Mail": 1 / 3, "Womens E-Mail": 1 / 3}
+    rec = np.full(len(df), "Mens E-Mail")
+    contributions = policy_value_contributions(df, rec, "visit", propensities)
+    assert contributions.tolist() == pytest.approx([0.0, 3.0, 0.0])
+    assert contributions.mean() == pytest.approx(ipw_policy_value(df, rec, "visit", propensities))
+
+
+def test_paired_policy_difference_ci_is_exactly_zero_for_identical_policies():
+    df = pd.DataFrame(
+        {ARM_COL: ["No E-Mail", "Mens E-Mail", "Womens E-Mail"], "visit": [0.0, 1.0, 1.0]}
+    )
+    propensities = {"No E-Mail": 1 / 3, "Mens E-Mail": 1 / 3, "Womens E-Mail": 1 / 3}
+    rec = np.full(len(df), "Mens E-Mail")
+    point, ci_low, ci_high = bootstrap_policy_difference_ci(
+        df, rec, rec, "visit", propensities, n_boot=200, seed=0
+    )
+    assert (point, ci_low, ci_high) == pytest.approx((0.0, 0.0, 0.0))
 
 
 def test_learned_policy_beats_no_email_and_heuristic_on_real_data():

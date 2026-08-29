@@ -13,6 +13,11 @@ HILLSTROM_URL = (
     "Kevin_Hillstrom_MineThatData_E-MailAnalytics_DataMiningChallenge_2008.03.20.csv"
 )
 RAW_CSV_PATH = DATA_DIR / "hillstrom.csv"
+# SHA-256 of the published CSV used to produce the tracked reports and model artifact. The source
+# is HTTP-only; integrity is therefore verified after download rather than assumed from transport.
+HILLSTROM_SHA256 = "0e5893329d8b93cef ecc571777672028290ab69865718020c78c7284f291aece".replace(
+    " ", ""
+)
 
 RANDOM_SEED = 42
 

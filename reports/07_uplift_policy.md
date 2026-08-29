@@ -106,8 +106,9 @@ more interesting.
 **The honest result, stated plainly rather than dressed up: the learned policy does not**
 **clearly beat the simplest baseline that already knew the mens creative works better.**
 Learned policy value 0.1831 vs 0.1851 for blanket mens-emailing everyone, with heavily overlapping confidence intervals: not a result this report can call a win.
-Both comfortably and significantly beat the purchase-history heuristic
-(0.1756) and email-nobody (0.1061).
+The historical report used marginal-interval overlap to describe comparisons. The implementation
+now reports paired bootstrap differences instead; this static report must be regenerated before
+making a significance claim about policy-versus-policy comparisons.
 
 This is a real and explicable finding, not a failed experiment: the heterogeneity section
 above showed the mens creative's effect is positive for almost every segment,

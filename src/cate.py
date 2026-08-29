@@ -1,4 +1,4 @@
-"""Individual treatment effects via CausalForestDML, on `visit` only.
+"""Profile-level conditional average treatment effects via CausalForestDML, on `visit` only.
 
 `reports/data_dictionary.md` is why: `conversion`/`spend` have 578 events total across 64,000
 rows, nowhere near enough to split across a forest's leaves without the CATE surface being mostly
@@ -13,7 +13,7 @@ from econml.dml import CausalForestDML
 from lightgbm import LGBMClassifier, LGBMRegressor
 from sklearn.model_selection import train_test_split
 
-from src.config import EVAL_FRACTION, RANDOM_SEED, TREATMENT_COL
+from src.config import ARM_COL, EVAL_FRACTION, RANDOM_SEED, TREATMENT_COL
 from src.data_loader import build_covariate_matrix
 
 
@@ -22,7 +22,7 @@ def split_train_eval(
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Stratified on arm and visit jointly, not just one or the other, so both the treatment mix
     and the (rare) outcome rate are preserved in both halves."""
-    strat_key = df[TREATMENT_COL].astype(str) + "_" + df["visit"].astype(str)
+    strat_key = df[ARM_COL].astype(str) + "_" + df["visit"].astype(str)
     train_idx, eval_idx = train_test_split(
         df.index, test_size=EVAL_FRACTION, stratify=strat_key, random_state=seed
     )
@@ -76,7 +76,7 @@ def plot_cate_distribution(cate: np.ndarray, out_path) -> None:
     ax.axvline(cate.mean(), color="#b5842b", linewidth=2, label=f"mean {cate.mean():.4f}")
     ax.set_xlabel("estimated CATE on visit")
     ax.set_ylabel("customers (held-out eval set)")
-    ax.set_title("Distribution of individual treatment effects")
+    ax.set_title("Distribution of profile-level conditional average treatment effects")
     ax.legend()
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)

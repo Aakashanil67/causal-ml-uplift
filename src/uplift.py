@@ -46,7 +46,10 @@ def qini_coefficient(curve: pd.DataFrame) -> float:
     """Area between the model's gain curve and the random-targeting diagonal. Positive means the
     ranking beats random targeting; a perfect ranking (all uplift-positive customers ranked before
     all uplift-negative ones) maximises it; a random ranking averages to zero."""
-    return float(np.trapz(curve["gain"] - curve["random_line"], curve["k_frac"]))
+    integrate = getattr(np, "trapezoid", None)
+    if integrate is None:
+        integrate = np.trapz
+    return float(integrate(curve["gain"] - curve["random_line"], curve["k_frac"]))
 
 
 def uplift_deciles(
@@ -74,18 +77,45 @@ def uplift_deciles(
     return pd.DataFrame(rows).set_index("decile")
 
 
-def gain_per_target_at_k(
+def _validate_top_k_inputs(
+    cate_scores: np.ndarray, treatment: np.ndarray, outcome: np.ndarray, k: float
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]:
+    """Return ranked arrays and selected-segment size after validating a top-k request."""
+    scores = np.asarray(cate_scores)
+    T = np.asarray(treatment)
+    Y = np.asarray(outcome)
+    if not 0 < k <= 1:
+        raise ValueError("k must be in the interval (0, 1].")
+    if not (len(scores) == len(T) == len(Y)):
+        raise ValueError("cate_scores, treatment, and outcome must have the same length.")
+    if len(scores) == 0:
+        raise ValueError("Cannot evaluate an empty sample.")
+    if not np.isin(T, [0, 1]).all():
+        raise ValueError("treatment must be binary (0 for control, 1 for treated).")
+
+    order = np.argsort(-scores)
+    n_targeted = max(int(len(scores) * k), 1)
+    return scores[order], T[order], Y[order], n_targeted
+
+
+def uplift_per_email_at_k(
     cate_scores: np.ndarray, treatment: np.ndarray, outcome: np.ndarray, k: float
 ) -> float:
-    """Qini gain at fraction k, divided by the number of customers targeted — the expected
-    incremental outcome per customer emailed if the policy were "email everyone in the top k%"."""
-    curve = qini_curve(cate_scores, treatment, outcome)
-    idx = max(int(len(curve) * k) - 1, 0)
-    row = curve.iloc[idx]
-    return float(row["gain"] / row["n_targeted"])
+    """Estimate the incremental outcome per email for an all-email top-k policy.
+
+    The selected segment is defined by the predicted binary-CATE ranking. Within that segment, the
+    RCT identifies the effect of assignment to the pooled email mixture versus no email. This is
+    a treated-minus-control mean difference, not Qini gain divided by every selected row.
+    """
+    _, T, Y, n_targeted = _validate_top_k_inputs(cate_scores, treatment, outcome, k)
+    selected_T = T[:n_targeted]
+    selected_Y = Y[:n_targeted]
+    if not ((selected_T == 1).any() and (selected_T == 0).any()):
+        raise ValueError("Selected segment must contain both treated and control customers.")
+    return float(selected_Y[selected_T == 1].mean() - selected_Y[selected_T == 0].mean())
 
 
-def bootstrap_gain_per_target_ci(
+def bootstrap_uplift_per_email_ci(
     cate_scores: np.ndarray,
     treatment: np.ndarray,
     outcome: np.ndarray,
@@ -93,16 +123,23 @@ def bootstrap_gain_per_target_ci(
     n_boot: int = 1000,
     seed: int = 0,
 ) -> tuple[float, float]:
-    """Resamples the eval set with replacement, CATE scores held fixed per original row — this
-    captures evaluation-sample noise (would a different random eval split have shown the same
-    number), not model-fitting noise (a different training run could still give a different
-    CATE surface entirely; that isn't what this CI covers, and the report says so)."""
+    """Bootstrap a top-k pooled-email effect while holding each row's score fixed."""
     rng = np.random.default_rng(seed)
     n = len(cate_scores)
     estimates = np.empty(n_boot)
-    for b in range(n_boot):
+    b = 0
+    attempts = 0
+    max_attempts = n_boot * 20
+    while b < n_boot and attempts < max_attempts:
         idx = rng.integers(0, n, size=n)
-        estimates[b] = gain_per_target_at_k(cate_scores[idx], treatment[idx], outcome[idx], k)
+        attempts += 1
+        try:
+            estimates[b] = uplift_per_email_at_k(cate_scores[idx], treatment[idx], outcome[idx], k)
+        except ValueError:
+            continue
+        b += 1
+    if b < n_boot:
+        raise ValueError("Unable to draw bootstrap samples with both arms in the selected segment.")
     return float(np.percentile(estimates, 2.5)), float(np.percentile(estimates, 97.5))
 
 
@@ -280,15 +317,15 @@ def main() -> None:
     ks = [0.1, 0.2, 0.3, 0.5, 1.0]
     rows = []
     for k in ks:
-        gpt = gain_per_target_at_k(cate, T, Y_visit, k)
-        ci_low, ci_high = bootstrap_gain_per_target_ci(cate, T, Y_visit, k, n_boot=1000, seed=0)
+        gpt = uplift_per_email_at_k(cate, T, Y_visit, k)
+        ci_low, ci_high = bootstrap_uplift_per_email_ci(cate, T, Y_visit, k, n_boot=1000, seed=0)
         rows.append({"k": k, "gain_per_target": gpt, "ci_low": ci_low, "ci_high": ci_high})
     uplift_at_k_table = pd.DataFrame(rows).set_index("k")
     print(uplift_at_k_table)
 
     be_k = 0.3
-    be_gpt = gain_per_target_at_k(cate, T, Y_spend, be_k)
-    be_ci_low, be_ci_high = bootstrap_gain_per_target_ci(
+    be_gpt = uplift_per_email_at_k(cate, T, Y_spend, be_k)
+    be_ci_low, be_ci_high = bootstrap_uplift_per_email_ci(
         cate, T, Y_spend, be_k, n_boot=1000, seed=1
     )
     break_even = {

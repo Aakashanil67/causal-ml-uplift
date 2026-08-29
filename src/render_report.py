@@ -53,7 +53,10 @@ def render_pdf(
     html_body = markdown.markdown(
         md_path.read_text(encoding="utf-8"), extensions=["tables", "fenced_code"]
     )
-    html = f"<html><head><meta charset='utf-8'><style>{CSS}</style></head><body>{html_body}</body></html>"
+    html = (
+        "<html><head><meta charset='utf-8'><title>Causal ML Uplift Analysis</title>"
+        f"<style>{CSS}</style></head><body>{html_body}</body></html>"
+    )
     html_path = md_path.with_suffix(".html")
     html_path.write_text(html, encoding="utf-8")
 
@@ -65,7 +68,7 @@ def render_pdf(
             "--disable-gpu",
             "--no-sandbox",
             f"--print-to-pdf={out_path}",
-            "--print-to-pdf-no-header",
+            "--no-pdf-header-footer",
             html_path.resolve().as_uri(),
         ],
         check=True,

@@ -1,4 +1,4 @@
-"""Validates DML against a known truth rather than just asserting it works.
+"""Stress-tests DML under a constructed observational selection mechanism.
 
 Hillstrom is randomised, so nothing in the ladder so far has had real confounding to correct —
 every method from the naive diff-in-means onward agrees, because there was nothing to disagree
@@ -130,7 +130,7 @@ def write_confounding_report(benchmark: float, v1: dict, v2: dict, out_path) -> 
         return f"{x * 100:+.2f}pp"
 
     lines = [
-        "# Validating DML against a known truth: the confounding benchmark",
+        "# Constructed confounding stress test",
         "",
         "Every method so far agreed because Hillstrom is randomised and there was nothing to",
         "disagree about. This section manufactures real confounding from the same data and checks",

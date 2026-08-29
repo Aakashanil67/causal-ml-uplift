@@ -28,7 +28,8 @@ def test_app_runs_end_to_end_without_exceptions():
     assert not at.exception
 
     metrics = {m.label: m.value for m in at.get("metric")}
-    # spot-check against the known report numbers (reports/07_uplift_policy.md), not just "ran":
-    # the default top-30% slider position should reproduce the exact figures reported there.
+    # The default top-30% slider uses a treated-minus-control mean difference within the selected
+    # segment, the counterfactual all-email estimand. It must not revert to the old Qini-gain
+    # denominator (+0.0499) that divided by all selected rows.
     assert metrics["Customers targeted"] == "5,760 / 19,200"
-    assert metrics["Incremental visits per customer emailed"] == "+0.0499"
+    assert metrics["Incremental visits per customer emailed"] == "+0.0603"

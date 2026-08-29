@@ -25,7 +25,7 @@ Pooled treatment effect (any email vs none), `LinearDML` with LightGBM nuisance 
 | conversion | +0.50pp | [0.36, 0.64] |
 | spend | +$0.613 | [0.389, 0.837] |
 
-**Validating DML against a known truth** (`reports/06_confounding_benchmark.md`): confound the data on `recency`/`history`, keep both observed, and DML recovers +5.99pp against the true +6.01pp benchmark. Withhold the confounder (`newbie`) instead, and DML gives +9.49pp with a CI that excludes the benchmark entirely. DML fixes confounding it can see; it does not fix confounding nobody measured, and this report says so rather than only showing the case where it works.
+**Constructed confounding stress test** (`reports/06_confounding_benchmark.md`): selection on `recency`/`history` illustrates how adjustment changes an observational contrast when those covariates remain available; withholding `newbie` shows the corresponding failure mode. These are deliberately constructed scenarios, not a claim that the full-RCT estimate is the selected sample's known truth.
 
 ![CATE distribution](reports/figures/cate_distribution.png)
 
@@ -43,8 +43,8 @@ Pooled treatment effect (any email vs none), `LinearDML` with LightGBM nuisance 
 | 2. Regression baseline | `src/regression_baseline.py` | logit AME / OLS, agrees with #1 as it should on an RCT |
 | 3. DoWhy identification | `src/identify.py` | formal confirmation: empty backdoor set for every outcome |
 | 4. LinearDML | `src/dml_ate.py` | the headline ATE, pooled and per-arm |
-| 5. Confounding benchmark | `src/confounded.py` | does DML actually correct confounding? tested against a known truth |
-| 6. CausalForestDML | `src/cate.py` | individual effects, not just the average |
+| 5. Confounding stress test | `src/confounded.py` | illustrates adjustment with constructed selection scenarios |
+| 6. CausalForestDML | `src/cate.py` | profile-level conditional average effects, not just the average |
 | 7. Qini / uplift | `src/uplift.py` | is the ranking real, and what does targeting it pay for |
 | 8. Three-arm policy | `src/policy.py` | learned policy vs heuristic vs blanket-email baselines |
 | 9. Refutation | `src/refute.py` | what passing placebo/random-cause/subset tests does and doesn't prove |
