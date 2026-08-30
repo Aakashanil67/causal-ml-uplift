@@ -5,7 +5,6 @@ import pytest
 from src.config import ARM_COL, CONTROL_ARM, NOMINAL_PROPENSITIES
 from src.policy import (
     _treatment_name_to_arm,
-    append_policy_section,
     bootstrap_policy_difference_ci,
     dr_policy_value,
     heuristic_recommendations,
@@ -122,33 +121,6 @@ def test_dr_policy_value_uses_outcome_model_for_every_customer():
     # Baseline model contribution is 0.8 for everyone. The one matched mens row adds
     # (1.0 - 0.8) / (1/3), so the average is (0.8 + 1.4 + 0.8) / 3 = 1.0.
     assert value == pytest.approx(1.0)
-
-
-def test_policy_report_section_replaces_prior_run_instead_of_appending(tmp_path):
-    policy_values = pd.DataFrame(
-        {
-            "value": [0.18, 0.17, 0.19, 0.10],
-            "ci_low": [0.16, 0.15, 0.17, 0.09],
-            "ci_high": [0.20, 0.19, 0.21, 0.11],
-        },
-        index=[
-            "learned (DRPolicyForest)",
-            "purchase-history heuristic",
-            "email everyone (mens creative)",
-            "email nobody",
-        ],
-    )
-    comparisons = pd.DataFrame(
-        {"difference": [0.01], "ci_low": [-0.01], "ci_high": [0.03]},
-        index=["learned - blanket mens"],
-    )
-    out_path = tmp_path / "uplift.md"
-    out_path.write_text("# Uplift results\n", encoding="utf-8")
-
-    append_policy_section(policy_values, comparisons, {"Mens E-Mail": 10}, out_path)
-    append_policy_section(policy_values, comparisons, {"Mens E-Mail": 10}, out_path)
-
-    assert out_path.read_text(encoding="utf-8").count("## Three-action policy") == 1
 
 
 def test_real_policy_evidence_supports_only_the_no_email_comparison():

@@ -3,10 +3,12 @@ import json
 import pytest
 
 from src.results import (
+    build_provenance,
     load_evaluation_artifacts,
     load_results,
     save_evaluation_artifacts,
     save_results,
+    validate_provenance,
     validate_results,
 )
 
@@ -20,6 +22,8 @@ def valid_results():
             "feature_columns": ["recency", "history"],
             "random_seed": 42,
             "git_sha": "deadbeef",
+            "git_dirty": False,
+            "source_sha256": "source-fingerprint",
             "packages": {"scikit-learn": "1.5.2"},
         },
         "headline": {"visit_ate": 0.0601},
@@ -69,3 +73,17 @@ def test_evaluation_artifact_round_trip(tmp_path):
     save_evaluation_artifacts(payload, path)
 
     assert load_evaluation_artifacts(path) == payload
+
+
+def test_provenance_rejects_an_artifact_built_from_different_source():
+    metadata = build_provenance()
+    metadata["source_sha256"] = "not-the-current-source"
+
+    with pytest.raises(ValueError, match="source fingerprint"):
+        validate_provenance(metadata)
+
+
+def test_provenance_declares_whether_the_worktree_was_dirty():
+    metadata = build_provenance()
+
+    assert isinstance(metadata["git_dirty"], bool)

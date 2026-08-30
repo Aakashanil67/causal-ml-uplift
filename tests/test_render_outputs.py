@@ -61,9 +61,11 @@ def test_causal_report_intro_leads_with_the_supported_decision():
 
 def test_retired_report_generators_do_not_embed_result_numbers():
     uplift_source = (ROOT / "src" / "uplift.py").read_text(encoding="utf-8")
+    policy_source = (ROOT / "src" / "policy.py").read_text(encoding="utf-8")
 
     assert "p=0.006" not in uplift_source
     assert "close to twice as large" not in uplift_source
+    assert "append_policy_section" not in policy_source
 
 
 def test_synthesis_report_inventory_includes_the_final_gate():

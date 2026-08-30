@@ -1,5 +1,6 @@
 """Versioned contract for numerical results shared by reports and the app."""
 
+import hashlib
 import json
 import subprocess
 from importlib.metadata import version
@@ -21,6 +22,24 @@ REQUIRED_SECTIONS = {"metadata", "headline", "interactions", "ranking", "policy"
 PROVENANCE_PACKAGES = ("econml", "lightgbm", "numpy", "pandas", "scikit-learn")
 
 
+def source_sha256() -> str:
+    """Fingerprint the code and dependency declarations that define an artifact."""
+    paths = [
+        *sorted((ROOT / "src").rglob("*.py")),
+        ROOT / "app" / "simulator.py",
+        ROOT / "requirements.txt",
+        ROOT / "app" / "requirements.txt",
+        ROOT / "pyproject.toml",
+    ]
+    digest = hashlib.sha256()
+    for path in paths:
+        digest.update(path.relative_to(ROOT).as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
 def build_provenance() -> dict:
     try:
         git_sha = subprocess.run(
@@ -30,13 +49,25 @@ def build_provenance() -> dict:
             capture_output=True,
             text=True,
         ).stdout.strip()
+        git_dirty = bool(
+            subprocess.run(
+                ["git", "status", "--porcelain", "--untracked-files=normal"],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+        )
     except (FileNotFoundError, subprocess.CalledProcessError):
         git_sha = "unknown"
+        git_dirty = None
     return {
         "data_sha256": HILLSTROM_SHA256,
         "feature_columns": COVARIATE_COLS,
         "random_seed": RANDOM_SEED,
         "git_sha": git_sha,
+        "git_dirty": git_dirty,
+        "source_sha256": source_sha256(),
         "packages": {package: version(package) for package in PROVENANCE_PACKAGES},
     }
 
@@ -46,6 +77,8 @@ def validate_provenance(metadata: dict) -> None:
         raise ValueError("Artifact data checksum does not match this project.")
     if metadata.get("feature_columns") != COVARIATE_COLS:
         raise ValueError("Artifact feature schema does not match this project.")
+    if metadata.get("source_sha256") != source_sha256():
+        raise ValueError("Artifact source fingerprint does not match the current project.")
     runtime = {package: version(package) for package in PROVENANCE_PACKAGES}
     if metadata.get("packages") != runtime:
         raise ValueError("Artifact dependency versions do not match the current runtime.")
@@ -67,6 +100,8 @@ def validate_results(results: dict) -> None:
         "feature_columns",
         "random_seed",
         "git_sha",
+        "git_dirty",
+        "source_sha256",
         "packages",
     }
     missing_metadata = required_metadata - set(metadata)
