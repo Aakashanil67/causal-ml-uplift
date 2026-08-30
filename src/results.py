@@ -35,7 +35,9 @@ def source_sha256() -> str:
     for path in paths:
         digest.update(path.relative_to(ROOT).as_posix().encode("utf-8"))
         digest.update(b"\0")
-        digest.update(path.read_bytes())
+        # Git checkout line endings vary between Windows and Streamlit's Linux workers.
+        # Fingerprint source content, not that platform-specific representation.
+        digest.update(path.read_text(encoding="utf-8").replace("\r\n", "\n").encode("utf-8"))
         digest.update(b"\0")
     return digest.hexdigest()
 
