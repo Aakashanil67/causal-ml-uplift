@@ -7,6 +7,8 @@ DATA_DIR = ROOT / "data"
 REPORTS_DIR = ROOT / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"
 MODELS_DIR = ROOT / "models"
+RESULTS_PATH = REPORTS_DIR / "results.json"
+EVALUATION_ARTIFACT_PATH = MODELS_DIR / "evaluation_artifacts.joblib"
 
 HILLSTROM_URL = (
     "http://www.minethatdata.com/"
@@ -24,6 +26,7 @@ RANDOM_SEED = 42
 ARM_COL = "segment"
 ARMS = ["No E-Mail", "Mens E-Mail", "Womens E-Mail"]
 CONTROL_ARM = "No E-Mail"
+NOMINAL_PROPENSITIES = {arm: 1 / len(ARMS) for arm in ARMS}
 TREATMENT_COL = "treatment"  # 1 if segment != CONTROL_ARM, 0 otherwise — built by data_loader
 
 OUTCOME_COLS = ["visit", "conversion", "spend"]

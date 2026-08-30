@@ -4,7 +4,7 @@ Fifteen questions an interviewer would actually ask about this project, answered
 
 ## 1. What's the difference between ATE, ATT, and CATE, and which one did you estimate?
 
-ATE (average treatment effect) is the average effect across the whole population if everyone were treated versus if no one were. ATT (average treatment effect on the treated) is the same average but restricted to people who actually got treated. On a randomised experiment like Hillstrom's, treated and control are drawn from the same population by construction, so ATE and ATT coincide, which is part of why the naive diff-in-means, the regression AME, and the DML estimate all agree in `reports/05_dml_ate.md` (+6.01pp on visit). CATE (conditional average treatment effect) is the effect for a specific customer given their covariates, which is what `src/cate.py`'s `CausalForestDML` estimates: the mean CATE (+0.0588) is close to the pooled ATE, but the individual values range from about −0.02 to +0.13, and that spread is the entire point of estimating it.
+ATE averages the effect over the target population; ATT averages it over treated customers; CATE conditions on a covariate profile. Random assignment means treated and control customers represent the same population in expectation, not that finite-sample ATE and ATT are algebraically identical. This project reports a pooled DML ATE of +0.0601 on `visit`. The held-out forest's mean profile CATE is +0.0603, with estimates from -0.0073 to +0.1292.
 
 ## 2. What's the difference between a confounder, a mediator, and a collider, and why does it matter which one you control for?
 
@@ -28,7 +28,7 @@ Tried it first. DoWhy's econml integration passes effect-modifier columns straig
 
 ## 7. Your learned three-arm policy doesn't beat the simplest baseline. Isn't that a failure?
 
-No, and the report says why rather than hiding the result: `reports/07_uplift_policy.md` shows the learned `DRPolicyForest` policy scoring 0.1831 against 0.1851 for "email everyone the mens creative," with heavily overlapping confidence intervals. The mens creative has a positive effect for almost every segment in this data, including the weakest one (mens-only-purchase customers, +0.043 CATE, still clearly positive). When the simple action already works almost everywhere, there's little headroom for a smarter policy to improve on it. The learned policy still does real work: it correctly identifies that the "obvious" purchase-history-matching heuristic is worse than blanket mens-emailing, a genuinely counterintuitive finding a marketer wouldn't guess without the model.
+It is the decision result. Cross-fitted doubly robust evaluation gives the learned policy 0.1823 and blanket mens emailing 0.1810. Their paired difference is +0.0013 [-0.0014, +0.0040]. The interval includes zero. I would deploy the simpler blanket action on this evidence and treat policy learning as a design for the next experiment, not as a production win.
 
 ## 8. Why is your heterogeneity analysis only on `visit` and not `conversion` or `spend`?
 
@@ -40,11 +40,11 @@ Twelve customers have reported spend exactly $499.00, with a gap to the next-hig
 
 ## 10. Why does your revenue-based targeting number have such a wide confidence interval?
 
-Sample size. The break-even calculation in `reports/07_uplift_policy.md` uses `spend` as the outcome, and only 578 of 64,000 customers have non-zero spend. Bootstrapping the top-30% targeting fraction gives a point estimate of $0.1196 per email against an assumed $0.10 cost, but the 95% CI is [−$0.48, $0.63], crossing zero. The report leads with the visit-based numbers, which are precise, and states plainly that the revenue claim can't be statistically distinguished from a loss at this sample size, rather than reporting only the point estimate.
+The corrected top-30% estimate is $0.7816 in reported gross spend per targeted customer [0.3733, 1.2743]. Its interval is positive, but profitability is still unidentified: the data contain no gross margin, and twelve observations sit at the $499 maximum. The report therefore presents a gross-spend sensitivity rather than comparing it directly with email cost.
 
 ## 11. What's the Qini coefficient, and why compute it by hand instead of using an existing library?
 
-The Qini gain at a targeting fraction *k* is the sum of outcomes among the top-*k* treated customers minus the top-*k* control customers' outcome sum, rescaled to the treated group's size in that slice (Radcliffe & Surry, 2011). The Qini coefficient is the area between that curve and the random-targeting diagonal; this project's value is 47.10, positive, meaning the CATE ranking beats emailing customers in a random order. It's computed directly in `src/uplift.py` rather than via `scikit-uplift` so every number can be defended line by line rather than trusted as a library black box, and cross-checked against `sklift.metrics.qini_auc_score` in one test for sign agreement (different normalisations mean the magnitudes aren't directly comparable).
+Raw Qini is the area between cumulative incremental gain under the model ranking and random targeting; here it is 17.84, which depends on sample size. The normalized score is 0.0111 [-0.0114, 0.0331]. Five honest splits range from 0.0111 to 0.0360. The primary interval includes zero, so a positive raw area is not enough to claim a deployment-quality ranking.
 
 ## 12. How do you know your covariate balance table isn't just something you expected to see on an RCT?
 
@@ -60,4 +60,4 @@ The DAG treats `visit`, `conversion`, and `spend` as three parallel outcomes of 
 
 ## 15. If you had another month, what would you build next?
 
-A real spend-CATE model once more non-zero-spend data accumulates, rather than reusing the visit-based ranking as a proxy for revenue targeting. A second confounding-benchmark variant using a continuous, non-orthogonal confounder to see how gracefully DML degrades as the omitted variable becomes more correlated with what's already observed, rather than the current all-or-nothing (fully observed vs fully withheld) comparison. And a mediation analysis of the `visit → conversion → spend` chain, since the data supports it and the current project explicitly scopes it out rather than attempting it.
+I would run a new campaign designed around action-level trade-offs. Both creatives help almost every segment here, which leaves little policy headroom. I would also add a semi-synthetic Monte Carlo benchmark with known heterogeneous effects, bias and coverage across confounding strengths, then revisit spend CATEs only after collecting enough non-zero purchase outcomes to support honest leaves.

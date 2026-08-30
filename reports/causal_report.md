@@ -2,7 +2,7 @@
 
 ## Estimating who a marketing email persuades, on a randomised experiment, with constructed stress tests and refutation checks
 
-Does sending a customer a marketing email cause them to visit the site, or would they have done so anyway? On Hillstrom's 64,000-customer e-mail experiment (MineThatData, March 2008), the answer does not need to be hedged the usual way, because the comparison group was not estimated, it was built: customers were split at random into three arms (No E-Mail, 21,306; Mens E-Mail, 21,307; Womens E-Mail, 21,387) before the campaign ran. The headline result, defended across the rest of this report rather than just stated here: pooling both email arms lifts the two-week visit rate by 6.01 percentage points (95% CI [5.48, 6.55]), the effect is not the same for everyone (it runs from roughly −2pp to +13pp depending on the customer), and it is closer to twice as large for customers with a womens-only purchase history as for mens-only customers. A learned three-arm targeting policy beats naive heuristics but, honestly, does not clearly beat the simplest baseline of emailing everyone the stronger creative. Both findings are stated with the confidence they earn, not the confidence that would make a better slide.
+Hillstrom's 64,000-customer randomised experiment identifies a clear average result: assignment to either email raises the two-week visit rate by 6.01% [5.48%, 6.55%]. The individual-targeting result is weaker. Normalized Qini is 0.0111 [-0.0114, 0.0331], and the learned policy's advantage over blanket mens emailing is +0.0013 [-0.0014, +0.0040]. Neither interval supports personalised deployment. The decision supported by this campaign is blanket mens emailing, while the causal-ML work diagnoses what a better follow-up experiment must change.
 
 ## 1. The causal question and why identification is clean here
 
@@ -36,42 +36,15 @@ Every method above agreed because there was nothing to disagree about. `reports/
 
 ## 5. Heterogeneity: who the email actually helps
 
-Profile-level conditional average effects come from a `CausalForestDML` fit on a 70% train split, evaluated only on the held-out 30% (`src/cate.py`; see `reports/data_dictionary.md` for why this targets `visit` specifically: `conversion` and `spend` have 578 events total across 64,000 rows, nowhere near enough to split across a forest without the surface being mostly noise). Mean CATE on the eval set: +0.0588, close to the pooled DML benchmark, with real spread: std 0.0218, range roughly −0.02 to +0.13. These are conditional averages for covariate profiles, not individual treatment effects.
-
-![distribution of profile-level conditional average effects](figures/cate_distribution.png)
-
-The headline segmentation is prior purchase category, not recency or history, confirmed with an OLS interaction test before trusting the forest's split (treatment × `womens` p<0.001, treatment × `mens` p=0.006, both real; treatment × `recency`/`history`, checked for Section 4's confounding construction, both p>0.11, not significant):
-
-| prior purchase | mean CATE | n (eval set) |
-|---|---|---|
-| womens only | +0.071 | 8,625 |
-| mens only | +0.043 | 8,633 |
-| both | +0.076 | 1,942 |
-
-![CATE by prior purchase category](figures/cate_by_purchase_history.png)
-
-The pooled email works for almost everyone in this data, but nearly twice as strongly for womens-purchase customers as for mens-only customers, the segmentation that Section 7's policy work has to justify improving on.
+The causal forest estimates profile-level conditional average effects on `visit`. I did not treat its segments as evidence on their own. A pre-specified HC1-robust interaction regression gives treatment × `mens` +0.0333 (Holm p=0.0184) and treatment × `womens` +0.0659 (Holm p=2.42e-07). Recency and history both have adjusted p-values of 1.000. The joint Wald p-value is 1.01e-10. Purchase history therefore supports a segment-level interpretation; recency and prior spend do not.
 
 ## 6. Uplift ranking and targeting economics
 
-Ranking the eval set by predicted CATE and computing the Qini gain by hand (Radcliffe & Surry 2011 definition, cross-checked against `sklift.metrics.qini_auc_score` for sign agreement) gives a raw Qini coefficient of 17.84. The deciles are not monotonic: the top two average +0.0535 observed uplift against +0.0534 for the bottom two. That check does not establish a useful ranking gradient in this split, despite the positive raw Qini area (`reports/07_uplift_policy.md`).
-
-![Qini curve](figures/qini_curve.png)
-
-The top-30% pooled-email-mixture diagnostic estimates +0.0603 incremental visits per emailed customer (95% CI [+0.0406, +0.0795]) using the selected segment's treated-minus-control mean difference. It is not a creative-specific deployment rule: the historical binary treatment mixes mens and womens email, so creative selection belongs to the three-action analysis below. Reported gross spend is +$0.7816 per targeted customer (95% CI [$0.3733, $1.2743]), but that is not profit or a break-even result without a gross-margin assumption and a model of possible spend top-coding.
+The primary split's normalized Qini is 0.0111 [-0.0114, 0.0331]. Five honest splits are all positive, but range from 0.0111 to 0.0360; the primary bootstrap interval still includes zero. That is weak ranking evidence. The top-30% pooled-mixture diagnostic estimates +0.0603 visits per emailed customer, but it does not tell a marketer which creative to send. The three-action analysis answers that separate question.
 
 ## 7. Three actions, not two: an honest result
 
-The mens and womens creatives are different treatments, so `econml.policy.DRPolicyForest` was fit to recommend one of three actions per customer (no email, mens email, or womens email) and scored against three baselines by inverse-propensity weighting on the real held-out arms (`reports/07_uplift_policy.md`):
-
-| policy | expected visit rate | 95% CI |
-|---|---|---|
-| learned (DRPolicyForest) | 0.1838 | [0.1738, 0.1936] |
-| email everyone (mens creative) | 0.1827 | [0.1726, 0.1929] |
-| purchase-history heuristic | 0.1814 | [0.1714, 0.1914] |
-| email nobody | 0.1062 | [0.0981, 0.1141] |
-
-`Email nobody` recovers the true control rate almost exactly (0.1062 vs 0.1062), the sanity check that the IPW estimator itself is unbiased. Paired row-level bootstrap differences show learned minus blanket mens at +0.0011 (95% CI [−0.0019, +0.0040]) and learned minus the purchase-history heuristic at +0.0024 ([−0.0079, +0.0135]); neither supports a claimed policy win. Learned minus no email is +0.0776 ([+0.0644, +0.0907]).
+Cross-fitted doubly robust evaluation gives the learned policy a visit-rate value of 0.1823, against 0.1810 for blanket mens emailing. The paired difference is +0.0013 [-0.0014, +0.0040]. Personalisation does not earn its operational complexity here. The evidence-supported decision is the simpler one: use the stronger mens creative broadly, then test a new campaign designed to create genuine action-level trade-offs.
 
 ## 8. Refutation tests, and what they do not prove
 
@@ -96,6 +69,13 @@ The mechanics transfer directly: a bank or telco running a retention-offer RCT c
 
 Using Double Machine Learning to estimate heterogeneous treatment effects, and validating that estimation against a constructed benchmark before trusting it on a question without one, is the general version of what Section 4 does with `recency`/`history`/`newbie`. That is the shape of a thesis-length question worth asking about a real emerging-market intervention: not "does the policy work on average" but "for whom does it work, how would we know if our method could tell the difference, and what happens to the recommended policy once the default action itself is worth being smarter than."
 
+
+## References
+
+- Hillstrom, K. (2008), [MineThatData E-Mail Analytics Challenge](https://blog.minethatdata.com/2008/05/best-answer-e-mail-analytics-challenge.html).
+- Radcliffe, N. J. and Surry, P. D. (2011), [Real-World Uplift Modelling with Significance-Based Uplift Trees](https://stochasticsolutions.com/pdf/sig-based-up-trees.pdf).
+- Sharma, A. and Kiciman, E. (2020), [DoWhy: An End-to-End Library for Causal Inference](https://arxiv.org/abs/2011.04216).
+- Microsoft Research, [EconML 0.16 documentation](https://econml.azurewebsites.net/), including `CausalForestDML` and `DRPolicyForest`.
 ---
 
-**Repository**: [github.com/Aakashanil67/causal-ml-uplift](https://github.com/Aakashanil67/causal-ml-uplift) · **Live simulator**: see README · **Full reports**: `reports/01` through `reports/08`, this document synthesises all of them; none of the numbers above are restated from memory, each is sourced to the report that first computed it.
+**Repository**: [github.com/Aakashanil67/causal-ml-uplift](https://github.com/Aakashanil67/causal-ml-uplift) · **Live simulator**: see README · **Full reports**: `reports/01` through `reports/09`, this document synthesises all of them; none of the numbers above are restated from memory, each is sourced to the report that first computed it.

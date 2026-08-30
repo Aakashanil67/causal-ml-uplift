@@ -1,20 +1,10 @@
 """Three-action policy learning: for each customer, which of {no email, mens email, womens email}
 maximises expected `visit`, versus what an obvious purchase-history heuristic would do.
 
-`reports/05_dml_ate.md` already showed the mens and womens creatives are not interchangeable
-(+7.47pp vs +4.49pp on visit, pooled), and `reports/07_uplift_policy.md` showed that gap is itself
-customer-dependent. Once the effect varies by both customer and creative, "send an email or not"
-is the wrong question; `econml.policy.DRPolicyForest` answers the right one directly, picking a
-per-customer recommended arm from a doubly-robust reward estimate for each arm relative to the
-`No E-Mail` baseline.
-
-Every policy here, learned or heuristic, is scored the same way on the held-out eval set: an
-inverse-propensity-weighted (IPW) value estimator. Because arm assignment was randomised with known
-probabilities, `sum(1(actual_arm == recommended_arm) * Y / P(actual_arm)) / n` is an unbiased
-estimate of the average outcome under a policy, using only the customers whose real arm happened to
-match what the policy would have recommended — the standard off-policy evaluation trick for
-scoring a counterfactual policy against real experimental data without needing to run a new
-experiment for it.
+The published policy comparison is built in `src.build_artifacts` and evaluated by
+`src.evaluation` with cross-fitted outcome models and a doubly robust estimator. This module owns
+the policy learner, recommendation rules, and small inverse-propensity utilities used for
+diagnostics and tests. The pipeline, rather than this module, is the sole publisher of results.
 """
 
 import numpy as np
@@ -82,6 +72,59 @@ def policy_value_contributions(
     return matched * Y / p
 
 
+def dr_policy_contributions(
+    df: pd.DataFrame,
+    recommended_arm: np.ndarray,
+    outcome_col: str,
+    propensities: dict,
+    outcome_predictions: pd.DataFrame,
+) -> np.ndarray:
+    """One augmented-IPW contribution per row for a fixed policy."""
+    actual_arm = df[ARM_COL].to_numpy()
+    rec = np.asarray(recommended_arm)
+    if len(rec) != len(df) or len(outcome_predictions) != len(df):
+        raise ValueError("Recommendations and outcome predictions must align with df.")
+    missing = set(np.unique(np.concatenate([actual_arm, rec]))) - set(outcome_predictions.columns)
+    if missing:
+        raise ValueError(f"Outcome predictions missing arms: {sorted(missing)}")
+
+    row = np.arange(len(df))
+    mu_rec = outcome_predictions.to_numpy()[row, outcome_predictions.columns.get_indexer(rec)]
+    mu_actual = outcome_predictions.to_numpy()[
+        row, outcome_predictions.columns.get_indexer(actual_arm)
+    ]
+    matched = actual_arm == rec
+    p = np.array([propensities[arm] for arm in actual_arm])
+    residual = df[outcome_col].to_numpy(dtype=float) - mu_actual
+    return mu_rec + matched * residual / p
+
+
+def dr_policy_value(
+    df: pd.DataFrame,
+    recommended_arm: np.ndarray,
+    outcome_col: str,
+    propensities: dict,
+    outcome_predictions: pd.DataFrame,
+) -> float:
+    return float(
+        dr_policy_contributions(
+            df, recommended_arm, outcome_col, propensities, outcome_predictions
+        ).mean()
+    )
+
+
+def stratified_bootstrap_indices(df: pd.DataFrame, n_boot: int = 1000, seed: int = 0) -> np.ndarray:
+    """Bootstrap rows within randomized arms, preserving each arm's sample size."""
+    rng = np.random.default_rng(seed)
+    groups = [np.flatnonzero(df[ARM_COL].to_numpy() == arm) for arm in df[ARM_COL].unique()]
+    return np.array(
+        [
+            np.concatenate([rng.choice(group, len(group), replace=True) for group in groups])
+            for _ in range(n_boot)
+        ]
+    )
+
+
 def bootstrap_policy_value_ci(
     df: pd.DataFrame,
     recommended_arm: np.ndarray,
@@ -90,12 +133,9 @@ def bootstrap_policy_value_ci(
     n_boot: int = 1000,
     seed: int = 0,
 ) -> tuple[float, float]:
-    rng = np.random.default_rng(seed)
-    n = len(df)
     df_arr = df.reset_index(drop=True)
     estimates = np.empty(n_boot)
-    for b in range(n_boot):
-        idx = rng.integers(0, n, size=n)
+    for b, idx in enumerate(stratified_bootstrap_indices(df_arr, n_boot, seed)):
         estimates[b] = ipw_policy_value(
             df_arr.iloc[idx], recommended_arm[idx], outcome_col, propensities
         )
@@ -119,8 +159,7 @@ def bootstrap_policy_difference_ci(
     a = policy_value_contributions(df, recommended_arm_a, outcome_col, propensities)
     b = policy_value_contributions(df, recommended_arm_b, outcome_col, propensities)
     differences = a - b
-    rng = np.random.default_rng(seed)
-    indices = rng.integers(0, len(differences), size=(n_boot, len(differences)))
+    indices = stratified_bootstrap_indices(df.reset_index(drop=True), n_boot, seed)
     estimates = differences[indices].mean(axis=1)
     return (
         float(differences.mean()),
@@ -224,55 +263,7 @@ def append_policy_section(
 
 
 def main() -> None:
-    from src.cate import split_train_eval
-    from src.config import REPORTS_DIR
-    from src.data_loader import load_hillstrom
-
-    df = load_hillstrom()
-    train, eval_df = split_train_eval(df)
-
-    propensities = df[ARM_COL].value_counts(normalize=True).to_dict()
-
-    pf = fit_policy_forest(train)
-    learned_rec = policy_forest_recommendations(pf, eval_df)
-    heuristic_rec = heuristic_recommendations(eval_df)
-    none_rec = np.full(len(eval_df), CONTROL_ARM)
-    mens_rec = np.full(len(eval_df), "Mens E-Mail")
-
-    policies = {
-        "learned (DRPolicyForest)": learned_rec,
-        "purchase-history heuristic": heuristic_rec,
-        "email everyone (mens creative)": mens_rec,
-        "email nobody": none_rec,
-    }
-    rows = []
-    for name, rec in policies.items():
-        value = ipw_policy_value(eval_df, rec, "visit", propensities)
-        ci_low, ci_high = bootstrap_policy_value_ci(eval_df, rec, "visit", propensities)
-        rows.append({"policy": name, "value": value, "ci_low": ci_low, "ci_high": ci_high})
-        print(f"{name}: {value:.4f} [{ci_low:.4f}, {ci_high:.4f}]")
-    policy_values = pd.DataFrame(rows).set_index("policy")
-
-    comparison_rows = []
-    for label, rec_a, rec_b in [
-        ("learned - blanket mens", learned_rec, mens_rec),
-        ("learned - purchase-history heuristic", learned_rec, heuristic_rec),
-        ("learned - email nobody", learned_rec, none_rec),
-    ]:
-        difference, ci_low, ci_high = bootstrap_policy_difference_ci(
-            eval_df, rec_a, rec_b, "visit", propensities
-        )
-        comparison_rows.append(
-            {"comparison": label, "difference": difference, "ci_low": ci_low, "ci_high": ci_high}
-        )
-    comparisons = pd.DataFrame(comparison_rows).set_index("comparison")
-
-    rec_counts = pd.Series(learned_rec).value_counts().to_dict()
-    print(rec_counts)
-
-    append_policy_section(
-        policy_values, comparisons, rec_counts, REPORTS_DIR / "07_uplift_policy.md"
-    )
+    raise SystemExit("Run `python -m src.pipeline` to rebuild the published policy outputs.")
 
 
 if __name__ == "__main__":

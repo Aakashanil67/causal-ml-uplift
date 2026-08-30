@@ -15,6 +15,7 @@ from econml.dml import CausalForestDML
 
 from src.config import COVARIATE_COLS, MODELS_DIR
 from src.data_loader import build_covariate_matrix
+from src.results import build_provenance, validate_provenance
 
 MODEL_PATH = MODELS_DIR / "causal_forest.joblib"
 
@@ -24,12 +25,16 @@ def fit_and_save(df: pd.DataFrame, out_path=MODEL_PATH) -> CausalForestDML:
 
     cf = fit_causal_forest(df)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump(cf, out_path)
+    joblib.dump({"model": cf, "metadata": build_provenance()}, out_path)
     return cf
 
 
 def load_model(path=MODEL_PATH) -> CausalForestDML:
-    return joblib.load(path)
+    artifact = joblib.load(path)
+    if not isinstance(artifact, dict) or set(artifact) != {"model", "metadata"}:
+        raise ValueError("Legacy model artifact has no provenance metadata; regenerate it.")
+    validate_provenance(artifact["metadata"])
+    return artifact["model"]
 
 
 def predict_cate_for_profile(model: CausalForestDML, profile: dict) -> dict:

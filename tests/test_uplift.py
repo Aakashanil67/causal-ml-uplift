@@ -1,10 +1,14 @@
 import numpy as np
+import pandas as pd
 import pytest
 
 from src.uplift import (
+    bootstrap_normalized_qini_ci,
     bootstrap_uplift_per_email_ci,
+    normalized_qini_score,
     qini_coefficient,
     qini_curve,
+    summarize_repeated_qini,
     uplift_deciles,
     uplift_per_email_at_k,
 )
@@ -103,6 +107,35 @@ def test_cross_check_against_scikit_uplift():
     # magnitude — both should agree the ranking has real signal.
     assert mine > 0
     assert theirs > 0
+
+
+def test_normalized_qini_matches_scikit_uplift_on_a_fixed_fixture():
+    sklift = pytest.importorskip("sklift.metrics")
+    expected = sklift.qini_auc_score(FIXTURE_Y, FIXTURE_SCORES, FIXTURE_T)
+
+    assert normalized_qini_score(FIXTURE_SCORES, FIXTURE_T, FIXTURE_Y) == pytest.approx(expected)
+
+
+def test_normalized_qini_bootstrap_is_deterministic():
+    point_a, low_a, high_a = bootstrap_normalized_qini_ci(
+        FIXTURE_SCORES, FIXTURE_T, FIXTURE_Y, n_boot=200, seed=17
+    )
+    point_b, low_b, high_b = bootstrap_normalized_qini_ci(
+        FIXTURE_SCORES, FIXTURE_T, FIXTURE_Y, n_boot=200, seed=17
+    )
+
+    assert (point_a, low_a, high_a) == pytest.approx((point_b, low_b, high_b))
+    assert low_a <= point_a <= high_a
+
+
+def test_repeated_qini_summary_keeps_split_level_evidence_visible():
+    runs = pd.DataFrame({"seed": [11, 22, 33], "normalized_qini": [0.04, -0.01, 0.02]})
+
+    summary = summarize_repeated_qini(runs)
+
+    assert summary == pytest.approx(
+        {"mean": 0.0166666667, "std": 0.0251661148, "min": -0.01, "max": 0.04}
+    )
 
 
 def test_uplift_deciles_top_beats_bottom_on_a_clean_synthetic_signal():

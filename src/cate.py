@@ -61,8 +61,8 @@ def heterogeneity_by_bin(eval_df: pd.DataFrame, cate: np.ndarray, covariate: str
 def heterogeneity_by_purchase_history(eval_df: pd.DataFrame, cate: np.ndarray) -> pd.DataFrame:
     """The headline heterogeneity finding: `mens`/`womens` purchase-history interacts with
     treatment far more strongly than `recency`/`history` do — confirmed with an OLS interaction
-    test before trusting the forest's split, not just read off the CATE distribution (T×mens
-    p=0.006, T×womens p<0.001; see reports/07_uplift_policy.md)."""
+    test in `src.interactions` before trusting the forest's split, rather than being read directly
+    from the CATE distribution."""
     tmp = eval_df.copy()
     tmp["cate"] = cate
     return tmp.groupby(["mens", "womens"])["cate"].agg(["mean", "count"])

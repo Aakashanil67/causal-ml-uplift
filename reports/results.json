@@ -1,0 +1,381 @@
+{
+  "headline": {
+    "per_arm_ate": [
+      {
+        "arm": "Mens E-Mail",
+        "ate": 0.07470168213664158,
+        "ci_high": 0.08124460700517823,
+        "ci_low": 0.06815875726810493,
+        "outcome": "visit"
+      },
+      {
+        "arm": "Mens E-Mail",
+        "ate": 0.006670528034863251,
+        "ci_high": 0.008475439717696723,
+        "ci_low": 0.00486561635202978,
+        "outcome": "conversion"
+      },
+      {
+        "arm": "Mens E-Mail",
+        "ate": 0.782942445298134,
+        "ci_high": 1.0786678474623672,
+        "ci_low": 0.4872170431339007,
+        "outcome": "spend"
+      },
+      {
+        "arm": "Womens E-Mail",
+        "ate": 0.044906299114994476,
+        "ci_high": 0.05115748517072151,
+        "ci_low": 0.03865511305926744,
+        "outcome": "visit"
+      },
+      {
+        "arm": "Womens E-Mail",
+        "ate": 0.0033250484891089245,
+        "ci_high": 0.0049522399958863185,
+        "ci_low": 0.0016978569823315303,
+        "outcome": "conversion"
+      },
+      {
+        "arm": "Womens E-Mail",
+        "ate": 0.4467795637483961,
+        "ci_high": 0.7050690773383608,
+        "ci_low": 0.1884900501584314,
+        "outcome": "spend"
+      }
+    ],
+    "pooled_ate": [
+      {
+        "ate": 0.06012814761308752,
+        "ci_high": 0.06550372157211637,
+        "ci_low": 0.05475257365405866,
+        "outcome": "visit"
+      },
+      {
+        "ate": 0.004965499851374621,
+        "ci_high": 0.006378473138591923,
+        "ci_low": 0.003552526564157317,
+        "outcome": "conversion"
+      },
+      {
+        "ate": 0.6130960041641669,
+        "ci_high": 0.8371100780190088,
+        "ci_low": 0.38908193030932486,
+        "outcome": "spend"
+      }
+    ]
+  },
+  "interactions": {
+    "joint_p_value": 1.0127106430818269e-10,
+    "terms": [
+      {
+        "ci_high": 0.057165148614279494,
+        "ci_low": 0.00948638048567433,
+        "estimate": 0.03332576454997691,
+        "p_holm": 0.018437905559718026,
+        "p_value": 0.006145968519906009,
+        "std_error": 0.012163174554402327,
+        "term": "mens"
+      },
+      {
+        "ci_high": 0.08977579821556243,
+        "ci_low": 0.0420756142731389,
+        "estimate": 0.06592570624435067,
+        "p_holm": 2.4151826584195336e-07,
+        "p_value": 6.037956646048834e-08,
+        "std_error": 0.01216863787260289,
+        "term": "womens"
+      },
+      {
+        "ci_high": 0.0014738048155633486,
+        "ci_low": -0.0017262504475205236,
+        "estimate": -0.0001262228159785874,
+        "p_holm": 1.0,
+        "p_value": 0.8771229216776059,
+        "std_error": 0.0008163556290639777,
+        "term": "recency"
+      },
+      {
+        "ci_high": 2.0525287411022022e-05,
+        "ci_low": -2.9952512093879143e-05,
+        "estimate": -4.71361234142856e-06,
+        "p_holm": 1.0,
+        "p_value": 0.7143333488559946,
+        "std_error": 1.2877226291672604e-05,
+        "term": "history"
+      }
+    ]
+  },
+  "metadata": {
+    "data_sha256": "0e5893329d8b93cefecc571777672028290ab69865718020c78c7284f291aece",
+    "feature_columns": [
+      "recency",
+      "history",
+      "mens",
+      "womens",
+      "newbie",
+      "zip_code",
+      "channel"
+    ],
+    "git_sha": "3049652fe440",
+    "packages": {
+      "econml": "0.16.0",
+      "lightgbm": "4.7.0",
+      "numpy": "1.26.4",
+      "pandas": "2.2.3",
+      "scikit-learn": "1.5.2"
+    },
+    "random_seed": 42
+  },
+  "policy": {
+    "comparisons": [
+      {
+        "ci_high": 0.003992701743420809,
+        "ci_low": -0.0013546101275354412,
+        "comparison": "learned (DRPolicyForest) - email everyone (mens creative)",
+        "difference": 0.0012586563744212617
+      },
+      {
+        "ci_high": 0.0110518228810939,
+        "ci_low": -0.007870800148806926,
+        "comparison": "learned (DRPolicyForest) - purchase-history heuristic",
+        "difference": 0.0019050342038497436
+      },
+      {
+        "ci_high": 0.08771449216739129,
+        "ci_low": 0.06337633292211754,
+        "comparison": "learned (DRPolicyForest) - email nobody",
+        "difference": 0.07528443759872819
+      }
+    ],
+    "conclusion": "Held-out evidence does not establish that the learned policy beats blanket mens emailing. Blanket mens is the simpler evidence-supported action; personalised policy deployment needs a new experiment or stronger cross-campaign evidence.",
+    "empirical_propensities": {
+      "Mens E-Mail": 0.332921875,
+      "No E-Mail": 0.33290625,
+      "Womens E-Mail": 0.334171875
+    },
+    "empirical_propensity_values": [
+      {
+        "ci_high": 0.19321576846492752,
+        "ci_low": 0.1730672714895046,
+        "policy": "learned (DRPolicyForest)",
+        "value": 0.1822503323596999
+      },
+      {
+        "ci_high": 0.1906509461978789,
+        "ci_low": 0.17148754208868058,
+        "policy": "email everyone (mens creative)",
+        "value": 0.1809936852773626
+      },
+      {
+        "ci_high": 0.18947843858505325,
+        "ci_low": 0.17126881354186818,
+        "policy": "purchase-history heuristic",
+        "value": 0.1803392296037827
+      },
+      {
+        "ci_high": 0.11328039857387905,
+        "ci_low": 0.10039559133871745,
+        "policy": "email nobody",
+        "value": 0.10697262596771798
+      }
+    ],
+    "nominal_propensities": {
+      "Mens E-Mail": 0.3333333333333333,
+      "No E-Mail": 0.3333333333333333,
+      "Womens E-Mail": 0.3333333333333333
+    },
+    "recommendation_counts": {
+      "Mens E-Mail": 18537,
+      "Womens E-Mail": 663
+    },
+    "values": [
+      {
+        "ci_high": 0.19156640993895727,
+        "ci_low": 0.1730473298006972,
+        "policy": "learned (DRPolicyForest)",
+        "value": 0.18225030937760378
+      },
+      {
+        "ci_high": 0.19018346505722694,
+        "ci_low": 0.17186349960860778,
+        "policy": "email everyone (mens creative)",
+        "value": 0.18099165300318248
+      },
+      {
+        "ci_high": 0.18999189982744533,
+        "ci_low": 0.1706263951383255,
+        "policy": "purchase-history heuristic",
+        "value": 0.18034527517375398
+      },
+      {
+        "ci_high": 0.1150713789654324,
+        "ci_low": 0.09935611982866567,
+        "policy": "email nobody",
+        "value": 0.10696587177887555
+      }
+    ]
+  },
+  "ranking": {
+    "cate_summary": {
+      "max": 0.12915934475560067,
+      "mean": 0.06031053776029973,
+      "min": -0.007257459259963843,
+      "std": 0.02300033796960301
+    },
+    "deciles": [
+      {
+        "decile": 0,
+        "n": 1920,
+        "observed_uplift": 0.040014765596160934,
+        "pred_cate_mean": 0.10093678848845669
+      },
+      {
+        "decile": 1,
+        "n": 1920,
+        "observed_uplift": 0.06701693807806712,
+        "pred_cate_mean": 0.08625655234099246
+      },
+      {
+        "decile": 2,
+        "n": 1920,
+        "observed_uplift": 0.07375401830024048,
+        "pred_cate_mean": 0.07660241361081913
+      },
+      {
+        "decile": 3,
+        "n": 1920,
+        "observed_uplift": 0.08559194742501629,
+        "pred_cate_mean": 0.06844329809612848
+      },
+      {
+        "decile": 4,
+        "n": 1920,
+        "observed_uplift": 0.07832282710655111,
+        "pred_cate_mean": 0.06170222706678838
+      },
+      {
+        "decile": 5,
+        "n": 1920,
+        "observed_uplift": 0.05754598026001129,
+        "pred_cate_mean": 0.056120676766314374
+      },
+      {
+        "decile": 6,
+        "n": 1920,
+        "observed_uplift": 0.05443973349485162,
+        "pred_cate_mean": 0.05064480740162644
+      },
+      {
+        "decile": 7,
+        "n": 1920,
+        "observed_uplift": 0.043085148203475115,
+        "pred_cate_mean": 0.044777239874514985
+      },
+      {
+        "decile": 8,
+        "n": 1920,
+        "observed_uplift": 0.060997070337754714,
+        "pred_cate_mean": 0.03691047852182556
+      },
+      {
+        "decile": 9,
+        "n": 1920,
+        "observed_uplift": 0.045837868742509696,
+        "pred_cate_mean": 0.020710895435530795
+      }
+    ],
+    "gross_spend_top_30": {
+      "ci_high": 1.2742767011827536,
+      "ci_low": 0.3733016274225024,
+      "value": 0.7815918677976146
+    },
+    "normalized_qini": {
+      "ci_high": 0.03310713431136698,
+      "ci_low": -0.011427908654872445,
+      "value": 0.011114646791712637
+    },
+    "purchase_history": [
+      {
+        "count": 8633,
+        "mean": 0.07456025705788343,
+        "mens": 0,
+        "womens": 1
+      },
+      {
+        "count": 8655,
+        "mean": 0.043779591893088395,
+        "mens": 1,
+        "womens": 0
+      },
+      {
+        "count": 1912,
+        "mean": 0.0708008671455895,
+        "mens": 1,
+        "womens": 1
+      }
+    ],
+    "raw_qini": 17.844097338900895,
+    "repeated_splits": [
+      {
+        "normalized_qini": 0.011114646791712637,
+        "seed": 42
+      },
+      {
+        "normalized_qini": 0.019561709294538165,
+        "seed": 7
+      },
+      {
+        "normalized_qini": 0.02150335093666316,
+        "seed": 19
+      },
+      {
+        "normalized_qini": 0.017147760830402897,
+        "seed": 73
+      },
+      {
+        "normalized_qini": 0.03595608547651271,
+        "seed": 101
+      }
+    ],
+    "repeated_summary": {
+      "max": 0.03595608547651271,
+      "mean": 0.021056710665965917,
+      "min": 0.011114646791712637,
+      "std": 0.009199869690297466
+    },
+    "top_k": [
+      {
+        "ci_high": 0.07747095567846593,
+        "ci_low": 0.004918283781380183,
+        "k": 0.1,
+        "value": 0.040014765596160934
+      },
+      {
+        "ci_high": 0.07804235054475639,
+        "ci_low": 0.0297967178359971,
+        "k": 0.2,
+        "value": 0.053615178692211135
+      },
+      {
+        "ci_high": 0.07950532135505432,
+        "ci_low": 0.04059221580072436,
+        "k": 0.3,
+        "value": 0.06027227829285714
+      },
+      {
+        "ci_high": 0.08350803032925666,
+        "ci_low": 0.05420583153436197,
+        "k": 0.5,
+        "value": 0.06907374895408623
+      },
+      {
+        "ci_high": 0.07044402458066426,
+        "ci_low": 0.051435663029093144,
+        "k": 1.0,
+        "value": 0.06077846371049385
+      }
+    ]
+  },
+  "schema_version": 1
+}

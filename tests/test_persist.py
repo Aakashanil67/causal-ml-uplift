@@ -1,8 +1,10 @@
+import joblib
 import numpy as np
 import pytest
 
 from src.config import RANDOM_SEED
 from src.persist import fit_and_save, load_model, predict_cate_for_profile
+from src.results import build_provenance
 
 VALID_PROFILE = {
     "recency": 3,
@@ -67,3 +69,28 @@ def test_committed_model_artifact_is_under_the_surrogate_threshold():
         pytest.skip("models/causal_forest.joblib not present in this checkout")
     size_mb = MODEL_PATH.stat().st_size / 1e6
     assert size_mb < 50, f"{MODEL_PATH} is {size_mb:.1f}MB, over the 50MB surrogate threshold"
+
+
+def test_model_loader_rejects_a_tampered_feature_contract(tmp_path):
+    metadata = build_provenance()
+    metadata["feature_columns"] = ["wrong_column"]
+    path = tmp_path / "tampered.joblib"
+    joblib.dump({"model": object(), "metadata": metadata}, path)
+
+    with pytest.raises(ValueError, match="feature schema"):
+        load_model(path)
+
+
+def test_provenance_records_reproducibility_inputs():
+    metadata = build_provenance()
+
+    assert metadata["random_seed"] == RANDOM_SEED
+    assert metadata["data_sha256"]
+    assert metadata["feature_columns"] == list(VALID_PROFILE)
+    assert set(metadata["packages"]) == {
+        "econml",
+        "lightgbm",
+        "numpy",
+        "pandas",
+        "scikit-learn",
+    }

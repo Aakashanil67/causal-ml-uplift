@@ -1,3 +1,6 @@
+import ast
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -11,12 +14,23 @@ def test_plot_cate_gauge_returns_a_figure():
     assert len(fig.axes) == 1
 
 
+def test_streamlit_request_path_does_not_fit_causal_models():
+    app_path = Path(__file__).resolve().parent.parent / "app" / "simulator.py"
+    tree = ast.parse(app_path.read_text(encoding="utf-8"))
+    called = {
+        node.func.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+
+    assert "fit_causal_forest" not in called
+    assert "fit_policy_forest" not in called
+
+
 @pytest.mark.slow
 def test_app_runs_end_to_end_without_exceptions():
-    # exercises both tabs for real: fits the production model load, the eval-split CausalForestDML
-    # and the DRPolicyForest (~35s total) — slow, but it's the only thing that actually proves the
-    # app doesn't crash on a fresh run, which browser-only testing during development already
-    # caught once (a "$...$" in a caption silently ate real content — see app/simulator.py).
+    # Exercises both tabs against the committed artifacts. This remains marked slow because
+    # Streamlit starts a full script runtime and unpickles the 34MB production forest.
     from pathlib import Path
 
     from streamlit.testing.v1 import AppTest
@@ -33,3 +47,5 @@ def test_app_runs_end_to_end_without_exceptions():
     # denominator (+0.0499) that divided by all selected rows.
     assert metrics["Customers targeted"] == "5,760 / 19,200"
     assert metrics["Incremental visits per customer emailed"] == "+0.0603"
+    warnings = [item.value for item in at.warning]
+    assert any("Normalized Qini" in text and "includes zero" in text for text in warnings)

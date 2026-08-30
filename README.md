@@ -17,23 +17,26 @@ The harder, more interesting problem the rest of this project is built around: d
 
 ## Results
 
-Pooled treatment effect (any email vs none), `LinearDML` with LightGBM nuisance models, cross-fitted:
+Pooled `LinearDML` effects for assignment to either email rather than no email:
 
 | outcome | DML ATE | 95% CI |
-|---|---|---|
-| visit | +6.01pp | [5.48, 6.55] |
-| conversion | +0.50pp | [0.36, 0.64] |
-| spend | +$0.613 | [0.389, 0.837] |
+|---|---:|---:|
+| visit | +6.01% | [5.48%, 6.55%] |
+| conversion | +0.50% | [0.36%, 0.64%] |
+| spend | +$0.613 | [$0.389, $0.837] |
 
-**Constructed confounding stress test** (`reports/06_confounding_benchmark.md`): selection on `recency`/`history` illustrates how adjustment changes an observational contrast when those covariates remain available; withholding `newbie` shows the corresponding failure mode. These are deliberately constructed scenarios, not a claim that the full-RCT estimate is the selected sample's known truth.
+The forest finds stable variation in predicted CATEs, but its ranking is weak. Normalized Qini is 0.0111 [-0.0114, 0.0331]; across five honest splits it ranges from 0.0111 to 0.0360. The interval includes zero, so the repo does not claim that individual uplift ordering is deployment-ready.
 
-![CATE distribution](reports/figures/cate_distribution.png)
+Three-action policies are evaluated with cross-fitted doubly robust scores:
 
-**Heterogeneity** (`CausalForestDML`, held-out 30% eval split): the pooled effect is not one number. It is roughly twice as large for customers with a womens-only purchase history (+0.071) as for mens-only customers (+0.043), confirmed with an OLS interaction test before trusting the forest's split, not just read off a tree.
+| policy | expected visit rate | 95% CI |
+|---|---:|---:|
+| learned (DRPolicyForest) | 0.1823 | [0.1730, 0.1916] |
+| email everyone (mens creative) | 0.1810 | [0.1719, 0.1902] |
+| purchase-history heuristic | 0.1803 | [0.1706, 0.1900] |
+| email nobody | 0.1070 | [0.0994, 0.1151] |
 
-![Qini curve](reports/figures/qini_curve.png)
-
-**Targeting policy, stated honestly**: a learned three-arm `DRPolicyForest` policy (no email / mens email / womens email) scores 0.1831 on held-out data, against 0.1851 for the trivial "email everyone the mens creative" baseline — heavily overlapping confidence intervals, checked directly rather than eyeballed. The learned policy does **not** clearly beat that baseline, and the report explains why rather than picking a metric that hides it: the mens creative already has a positive effect almost everywhere, so there is little room left for per-customer targeting to improve on it (`reports/07_uplift_policy.md`).
+Learned minus blanket mens is +0.0013 [-0.0014, +0.0040]. That is not a policy win. Blanket mens emailing is the simpler action supported by this experiment; personalised deployment needs new evidence.
 
 ## Methods ladder
 
@@ -51,29 +54,18 @@ Pooled treatment effect (any email vs none), `LinearDML` with LightGBM nuisance 
 
 ## How to run it
 
-```bash
-python -m venv .venv && .venv\Scripts\activate   # .venv/bin/activate on Mac/Linux
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+python -m src.pipeline
+streamlit run app/simulator.py
 ```
 
-```bash
-python -m src.data_loader          # downloads + caches data/hillstrom.csv
-python -m src.naive                # reports/02_naive_estimate.md
-python -m src.regression_baseline  # reports/03_regression_baseline.md
-python -m src.identify             # reports/04_identification.md
-python -m src.dml_ate              # reports/05_dml_ate.md
-python -m src.confounded           # reports/06_confounding_benchmark.md
-python -m src.cate                 # reports/figures/cate_*.png
-python -m src.uplift               # reports/07_uplift_policy.md (+ Qini figure)
-python -m src.policy               # appends the three-arm section to 07
-python -m src.refute               # reports/08_refutations.md
-python -m src.persist              # models/causal_forest.joblib
-python -m src.render_report        # reports/causal_report.pdf
-
-streamlit run app/simulator.py     # simulator at http://localhost:8501
-```
-
-Tests: `pytest -v` (79 tests; one marked `slow`, a full Streamlit `AppTest` run — `pytest -v -m "not slow"` for the fast subset). Lint: `ruff check . && ruff format --check .`. Pre-commit: `pre-commit install`.
+On macOS or Linux, activate with `source .venv/bin/activate`. The pipeline regenerates the
+manifest, serving artifacts, Markdown reports, figures, production model and PDF in dependency
+order. Run `pytest -v` for tests and `ruff check . && ruff format --check .` for the code-quality
+gate.
 
 ## Design decisions and trade-offs
 
@@ -86,8 +78,15 @@ Tests: `pytest -v` (79 tests; one marked `slow`, a full Streamlit `AppTest` run 
 
 ## Status
 
-Built and tested end to end: data loader through refutations, a Streamlit simulator tested in a real browser (three real bugs found and fixed there, not just imported and assumed working), a rendered PDF report opened and paged through, CI green on GitHub, not just passing locally, and the [live deployment](https://causal-ml-uplift.streamlit.app/) itself checked in a real browser after connecting — both tabs, the Qini curve, and the three-arm policy table all confirmed rendering correctly in production. What's not done:
+The average treatment effect is well identified by the randomised design. Two narrower
+claims are not established:
 
-- **The learned three-arm policy's advantage over "email everyone the stronger creative" is not statistically established** on this eval set. A larger sample, or a campaign with genuine segment-level harm from the default action, would show the value of granular targeting more clearly than this data can.
-- **The revenue-based targeting claim is underpowered** (578 non-zero spend values total): the point estimate clears the assumed per-email cost, but the confidence interval crosses zero. The report leads with the visit-based numbers, which are precise, and says this plainly rather than rounding the wide interval away.
-- **One campaign, one retailer, US, March 2008.** The method generalises; the +6pp does not. `reports/causal_report.md` has a section on what would and would not transfer to a South African retention campaign.
+- The uplift ranking is weak: normalized Qini 0.0111
+  [-0.0114, 0.0331] includes zero.
+- The learned policy does not beat blanket mens emailing on the held-out sample.
+
+Reported spend among the top-30% diagnostic is $0.7816
+[$0.3733, $1.2743], but Hillstrom supplies neither gross margin nor
+uncapped spend. It is therefore a gross-spend sensitivity, not a profit estimate. The experiment
+covers one US retailer in March 2008; its effect sizes do not transfer to a 2026 South African bank
+or telecoms campaign.

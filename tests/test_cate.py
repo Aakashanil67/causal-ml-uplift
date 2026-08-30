@@ -62,8 +62,8 @@ def test_mean_cate_close_to_pooled_ate_benchmark(cate_eval):
 def test_purchase_history_heterogeneity_is_real_not_noise(cate_eval):
     eval_df, cate = cate_eval
     table = heterogeneity_by_purchase_history(eval_df, cate)
-    # confirmed with an OLS interaction test (T x womens p<0.001, T x mens p=0.006) before
-    # trusting this — womens-only buyers should show a clearly higher CATE than mens-only buyers.
+    # The separately tested interaction analysis supports inspecting this split; this test only
+    # checks the deterministic forest's observed ordering on the fixed evaluation partition.
     womens_only = table.loc[(0, 1), "mean"]
     mens_only = table.loc[(1, 0), "mean"]
     assert womens_only > mens_only

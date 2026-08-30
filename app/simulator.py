@@ -1,13 +1,4 @@
-"""What-if simulator: a customer-profile tab (per-customer CATE with CI, plotted against the
-held-out CATE distribution) and a targeting-policy tab (email top X% by uplift, expected
-incremental visits, and the three-arm policy comparison from `reports/07_uplift_policy.md`).
-
-The heavy fits (`CausalForestDML`, `DRPolicyForest`) run once per server process via
-`st.cache_resource`, not on every slider move — the first load after a cold start takes ~30s, every
-interaction after that is instant. Tab 1 predicts from the production artifact
-(`models/causal_forest.joblib`, fit on all 64,000 rows); tab 2 evaluates on the held-out 30% split,
-matching the honest numbers already in the reports rather than a different, easier-to-compute one.
-"""
+"""Artifact-only Streamlit simulator for profile CATEs and held-out policy evidence."""
 
 import sys
 from pathlib import Path
@@ -25,25 +16,15 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import streamlit as st
 
-from src.cate import fit_causal_forest, predict_cate, split_train_eval
 from src.config import (
-    ARM_COL,
     CATEGORICAL_LEVELS,
-    CONTROL_ARM,
     DEFAULT_EMAIL_COST_USD,
     TREATMENT_COL,
 )
-from src.data_loader import load_hillstrom
 from src.persist import load_model, predict_cate_for_profile
-from src.policy import (
-    fit_policy_forest,
-    heuristic_recommendations,
-    ipw_policy_value,
-    policy_forest_recommendations,
-)
+from src.results import load_evaluation_artifacts, load_results
 from src.uplift import qini_curve, uplift_per_email_at_k
 
 st.set_page_config(page_title="Causal ML Uplift Simulator", layout="wide")
@@ -54,22 +35,15 @@ def get_production_model():
     return load_model()
 
 
-@st.cache_resource(show_spinner="Fitting the evaluation split (~30s on a cold start)...")
+@st.cache_resource(show_spinner="Loading held-out evaluation artifacts...")
 def get_eval_artifacts():
-    df = load_hillstrom()
-    train, eval_df = split_train_eval(df)
-    cf = fit_causal_forest(train)
-    cate = predict_cate(cf, eval_df)
-    return eval_df.reset_index(drop=True), cate
+    artifact = load_evaluation_artifacts()
+    return artifact["eval_df"], artifact["cate"]
 
 
-@st.cache_resource(show_spinner="Fitting the three-arm policy forest...")
-def get_policy_artifacts():
-    df = load_hillstrom()
-    train, eval_df = split_train_eval(df)
-    pf = fit_policy_forest(train)
-    propensities = df[ARM_COL].value_counts(normalize=True).to_dict()
-    return eval_df.reset_index(drop=True), pf, propensities
+@st.cache_resource(show_spinner="Loading policy evidence...")
+def get_public_artifacts():
+    return load_evaluation_artifacts(), load_results()
 
 
 def profile_form() -> dict:
@@ -165,6 +139,13 @@ def render_policy_tab():
         "This ranking evaluates assignment to the historical mens/womens email mixture versus no "
         "email. Use the three-action policy comparison below for a creative-specific action."
     )
+    artifact, results = get_public_artifacts()
+    qini = results["ranking"]["normalized_qini"]
+    st.warning(
+        f"Normalized Qini is {qini['value']:.4f} "
+        f"[{qini['ci_low']:.4f}, {qini['ci_high']:.4f}]. The interval includes zero, so this "
+        "ranking is diagnostic rather than deployment-ready."
+    )
     eval_df, eval_cate = get_eval_artifacts()
     T = eval_df[TREATMENT_COL].to_numpy()
     Y = eval_df["visit"].to_numpy(dtype=float)
@@ -213,25 +194,21 @@ def render_policy_tab():
     st.divider()
     st.subheader("Three-action policy: no email, mens email, or womens email")
     st.caption(
-        "The learned per-customer policy against three baselines, all scored the same way on the "
-        "held-out eval set (`reports/07_uplift_policy.md`)."
+        "Cross-fitted doubly robust values on the held-out eval set. The paired differences, not "
+        "the ordering of point estimates, determine whether one policy beats another."
     )
-    policy_eval_df, pf, propensities = get_policy_artifacts()
-    learned_rec = policy_forest_recommendations(pf, policy_eval_df)
-    heuristic_rec = heuristic_recommendations(policy_eval_df)
-    mens_rec = np.full(len(policy_eval_df), "Mens E-Mail")
-    none_rec = np.full(len(policy_eval_df), CONTROL_ARM)
+    values = artifact["policy_values"].copy()
+    values["95% CI"] = values.apply(
+        lambda row: f"[{row['ci_low']:.4f}, {row['ci_high']:.4f}]", axis=1
+    )
+    st.dataframe(values[["value", "95% CI"]], width="stretch")
 
-    rows = []
-    for name, rec in [
-        ("learned (DRPolicyForest)", learned_rec),
-        ("purchase-history heuristic", heuristic_rec),
-        ("email everyone (mens creative)", mens_rec),
-        ("email nobody", none_rec),
-    ]:
-        value = ipw_policy_value(policy_eval_df, rec, "visit", propensities)
-        rows.append({"policy": name, "expected visit rate": value})
-    st.dataframe(pd.DataFrame(rows).set_index("policy"), width="stretch")
+    comparisons = artifact["policy_comparisons"].copy()
+    comparisons["95% CI"] = comparisons.apply(
+        lambda row: f"[{row['ci_low']:+.4f}, {row['ci_high']:+.4f}]", axis=1
+    )
+    st.dataframe(comparisons[["difference", "95% CI"]], width="stretch")
+    st.info(results["policy"]["conclusion"])
 
 
 def main():
