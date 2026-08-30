@@ -1,6 +1,6 @@
 # Causal ML: what actually works?
 
-## Estimating who a marketing email persuades, on a randomised experiment, validated against a known benchmark and refutation-tested
+## Estimating who a marketing email persuades, on a randomised experiment, with constructed stress tests and refutation checks
 
 Does sending a customer a marketing email cause them to visit the site, or would they have done so anyway? On Hillstrom's 64,000-customer e-mail experiment (MineThatData, March 2008), the answer does not need to be hedged the usual way, because the comparison group was not estimated, it was built: customers were split at random into three arms (No E-Mail, 21,306; Mens E-Mail, 21,307; Womens E-Mail, 21,387) before the campaign ran. The headline result, defended across the rest of this report rather than just stated here: pooling both email arms lifts the two-week visit rate by 6.01 percentage points (95% CI [5.48, 6.55]), the effect is not the same for everyone (it runs from roughly −2pp to +13pp depending on the customer), and it is closer to twice as large for customers with a womens-only purchase history as for mens-only customers. A learned three-arm targeting policy beats naive heuristics but, honestly, does not clearly beat the simplest baseline of emailing everyone the stronger creative. Both findings are stated with the confidence they earn, not the confidence that would make a better slide.
 
@@ -54,11 +54,11 @@ The pooled email works for almost everyone in this data, but nearly twice as str
 
 ## 6. Uplift ranking and targeting economics
 
-Ranking the eval set by predicted CATE and computing the Qini gain by hand (Radcliffe & Surry 2011 definition, cross-checked against `sklift.metrics.qini_auc_score` for sign agreement) gives a Qini coefficient of 47.10: positive, meaning the ranking beats emailing customers in a random order. Uplift deciles are not perfectly monotonic (roughly 1,920 customers per decile and a rare binary outcome means real sampling noise at that granularity), but the top two deciles average +0.0736 observed uplift against +0.0404 for the bottom two, the gradient the ranking predicts (`reports/07_uplift_policy.md`).
+Ranking the eval set by predicted CATE and computing the Qini gain by hand (Radcliffe & Surry 2011 definition, cross-checked against `sklift.metrics.qini_auc_score` for sign agreement) gives a raw Qini coefficient of 17.84. The deciles are not monotonic: the top two average +0.0535 observed uplift against +0.0534 for the bottom two. That check does not establish a useful ranking gradient in this split, despite the positive raw Qini area (`reports/07_uplift_policy.md`).
 
 ![Qini curve](figures/qini_curve.png)
 
-The historical report's top-30% per-email figure used an incorrect Qini denominator. The implementation now estimates the selected segment's treated-minus-control mean difference and must regenerate this table before publishing a revised numerical claim. That binary ranking is a diagnostic for the historical mens/womens email mixture versus no email, not a creative-specific deployment rule.
+The top-30% pooled-email-mixture diagnostic estimates +0.0603 incremental visits per emailed customer (95% CI [+0.0406, +0.0795]) using the selected segment's treated-minus-control mean difference. It is not a creative-specific deployment rule: the historical binary treatment mixes mens and womens email, so creative selection belongs to the three-action analysis below. Reported gross spend is +$0.7816 per targeted customer (95% CI [$0.3733, $1.2743]), but that is not profit or a break-even result without a gross-margin assumption and a model of possible spend top-coding.
 
 ## 7. Three actions, not two: an honest result
 
@@ -66,12 +66,12 @@ The mens and womens creatives are different treatments, so `econml.policy.DRPoli
 
 | policy | expected visit rate | 95% CI |
 |---|---|---|
-| learned (DRPolicyForest) | 0.1831 | [0.1736, 0.1941] |
-| email everyone (mens creative) | 0.1851 | [0.1752, 0.1957] |
-| purchase-history heuristic | 0.1756 | [0.1662, 0.1852] |
-| email nobody | 0.1061 | [0.0984, 0.1137] |
+| learned (DRPolicyForest) | 0.1838 | [0.1738, 0.1936] |
+| email everyone (mens creative) | 0.1827 | [0.1726, 0.1929] |
+| purchase-history heuristic | 0.1814 | [0.1714, 0.1914] |
+| email nobody | 0.1062 | [0.0981, 0.1141] |
 
-`Email nobody` recovers the true control rate almost exactly (0.1061 vs 0.1062), the sanity check that the IPW estimator itself is unbiased. Policy differences must be assessed with paired row-level bootstrap intervals, not by overlap of marginal intervals. The implementation now reports those intervals and does not call learned-versus-heuristic or learned-versus-mens differences significant when they cross zero.
+`Email nobody` recovers the true control rate almost exactly (0.1062 vs 0.1062), the sanity check that the IPW estimator itself is unbiased. Paired row-level bootstrap differences show learned minus blanket mens at +0.0011 (95% CI [−0.0019, +0.0040]) and learned minus the purchase-history heuristic at +0.0024 ([−0.0079, +0.0135]); neither supports a claimed policy win. Learned minus no email is +0.0776 ([+0.0644, +0.0907]).
 
 ## 8. Refutation tests, and what they do not prove
 
@@ -85,7 +85,7 @@ The more useful result comes from running the same three refuters on Section 4's
 - **`spend` may be top-coded at exactly $499.00** for 12 customers (`reports/data_dictionary.md`). Estimates are therefore effects on the reported capped outcome; the uncapped-spend effect is not identified without a censoring model and is not automatically a lower bound.
 - **The DAG treats `visit`/`conversion`/`spend` as three parallel outcomes**, not the real mediation chain (`treatment → visit → conversion → spend`, which the data supports: conversion is a strict subset of visit). This report estimates the total effect of treatment on each outcome, which is standard and matches what DML/CausalForestDML compute; it does not decompose how much of the spend effect runs through visiting, which would need its own identification argument.
 - **The confounding validation in Section 4 tests selection on named, engineered covariates.** It shows DML corrects for confounding it can see and fails honestly on confounding it cannot. It says nothing about whether an unobserved confounder exists in the real, unconfounded Hillstrom data; the entire reason this project uses a randomised experiment is that it does not need to answer that question.
-- **The revenue-based targeting claim (Section 6) is underpowered**, and this report says so rather than rounding the wide interval away.
+- **Reported gross spend is not profit.** Section 6 does not infer break-even without a margin assumption, and possible spend top-coding leaves the uncapped-spend effect unidentified.
 - **The learned three-arm policy's advantage over the simplest baseline is not statistically established** on this eval set (Section 7). A larger eval sample, or a setting with real segment-level harm from the default action, would be needed to see policy learning's value more clearly than this data can show it.
 
 ## 10. What would and would not transfer to a South African retention campaign

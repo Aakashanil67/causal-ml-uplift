@@ -5,6 +5,7 @@ import pytest
 from src.config import ARM_COL, CONTROL_ARM
 from src.policy import (
     _treatment_name_to_arm,
+    append_policy_section,
     bootstrap_policy_difference_ci,
     heuristic_recommendations,
     ipw_policy_value,
@@ -77,6 +78,33 @@ def test_paired_policy_difference_ci_is_exactly_zero_for_identical_policies():
         df, rec, rec, "visit", propensities, n_boot=200, seed=0
     )
     assert (point, ci_low, ci_high) == pytest.approx((0.0, 0.0, 0.0))
+
+
+def test_policy_report_section_replaces_prior_run_instead_of_appending(tmp_path):
+    policy_values = pd.DataFrame(
+        {
+            "value": [0.18, 0.17, 0.19, 0.10],
+            "ci_low": [0.16, 0.15, 0.17, 0.09],
+            "ci_high": [0.20, 0.19, 0.21, 0.11],
+        },
+        index=[
+            "learned (DRPolicyForest)",
+            "purchase-history heuristic",
+            "email everyone (mens creative)",
+            "email nobody",
+        ],
+    )
+    comparisons = pd.DataFrame(
+        {"difference": [0.01], "ci_low": [-0.01], "ci_high": [0.03]},
+        index=["learned - blanket mens"],
+    )
+    out_path = tmp_path / "uplift.md"
+    out_path.write_text("# Uplift results\n", encoding="utf-8")
+
+    append_policy_section(policy_values, comparisons, {"Mens E-Mail": 10}, out_path)
+    append_policy_section(policy_values, comparisons, {"Mens E-Mail": 10}, out_path)
+
+    assert out_path.read_text(encoding="utf-8").count("## Three-action policy") == 1
 
 
 def test_learned_policy_beats_no_email_and_heuristic_on_real_data():

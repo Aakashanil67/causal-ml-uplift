@@ -235,9 +235,9 @@ def write_uplift_report(
     lines += [
         "",
         "Not perfectly monotonic. With roughly 1,920 customers per decile and a rare binary",
-        "outcome, individual deciles carry real sampling noise, but the top two deciles average",
-        f"{top2:+.4f} observed uplift against {bottom2:+.4f} for the bottom two, the gradient the",
-        "ranking predicts.",
+        "outcome, individual deciles carry real sampling noise. In this split the top two average",
+        f"{top2:+.4f} observed uplift against {bottom2:+.4f} for the bottom two, so the decile",
+        "comparison itself does not establish a useful ranking gradient.",
         "",
         f"**Qini coefficient: {qini_coef:.2f}** (area between the model's gain curve and random",
         "targeting; positive means the ranking beats emailing customers in a random order,",
@@ -256,29 +256,20 @@ def write_uplift_report(
         lines.append(
             f"| {int(k * 100)}% | {row['gain_per_target']:+.4f} | [{row['ci_low']:+.4f}, {row['ci_high']:+.4f}] |"
         )
-    ci_crosses_zero = break_even["ci_low"] < 0 < break_even["ci_high"]
     lines += [
         "",
-        "## Break-even email cost",
+        "## Gross-spend sensitivity",
         "",
         f"At the top-{int(break_even['k'] * 100)}% targeting fraction, the expected incremental",
-        f"**spend** per customer targeted is **${break_even['gain_per_target']:.4f}**",
-        f"(95% CI [${break_even['ci_low']:.4f}, ${break_even['ci_high']:.4f}]): the revenue side",
+        f"**reported spend** per customer targeted is **${break_even['gain_per_target']:.4f}**",
+        f"(95% CI [${break_even['ci_low']:.4f}, ${break_even['ci_high']:.4f}]): the gross-spend side",
         "of the same targeting policy, using the same visit-based ranking rather than a separate",
         "spend-CATE model (only 578 non-zero spend values total, see",
-        "`reports/data_dictionary.md`). The point estimate clears the assumed",
+        "`reports/data_dictionary.md`). This is not a break-even or profitability result: a",
+        "gross-margin assumption is required before comparing reported spend with the assumed",
         f"${break_even['assumed_cost']:.2f}-per-email cost",
-        "(`src/config.py:DEFAULT_EMAIL_COST_USD`, a stated assumption, not fitted) comfortably.",
-        (
-            "**The confidence interval crosses zero and runs negative, though**: at this sample "
-            "size, spend among 30%-of-64,000 customers is too sparse to statistically rule out "
-            "the segment losing money rather than paying for itself. The visit-based numbers "
-            "above are the ones this report actually stands behind; this section is a directional "
-            "read on revenue, not a claim with the same statistical footing."
-            if ci_crosses_zero
-            else "and the interval stays positive throughout, so this is a real, not just "
-            "directional, result."
-        ),
+        "(`src/config.py:DEFAULT_EMAIL_COST_USD`). Reported spend may also be top-coded, so this",
+        "section is a sensitivity input rather than a deployment recommendation.",
     ]
     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 

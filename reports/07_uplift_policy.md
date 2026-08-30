@@ -6,8 +6,8 @@ across a forest without the CATE surface being mostly noise).
 
 ## Heterogeneity: who the email actually helps
 
-Mean CATE on the eval set: **+0.0588** (std 0.0218,
-range [-0.0198, +0.1271]), close to the pooled DML
+Mean CATE on the eval set: **+0.0603** (std 0.0230,
+range [-0.0073, +0.1292]), close to the pooled DML
 benchmark of +0.0601 (`reports/05_dml_ate.md`), as it should be: the CATE mean and the
 pooled ATE are estimating the same population quantity two different ways.
 
@@ -15,9 +15,9 @@ The headline segmentation is prior purchase category, not recency or history:
 
 | prior purchase | mean CATE | n |
 |---|---|---|
-| womens only | +0.0708 | 8,625 |
-| mens only | +0.0429 | 8,633 |
-| both | +0.0762 | 1,942 |
+| womens only | +0.0746 | 8,633 |
+| mens only | +0.0438 | 8,655 |
+| both | +0.0708 | 1,912 |
 
 Confirmed with an OLS interaction test before trusting the forest's split, since a tree
 can carve out a segment from noise as easily as from a real pattern: treatment × `mens`
@@ -35,23 +35,23 @@ prediction, so this is a check on the ranking rather than a restatement of it.
 
 | decile | n | predicted CATE | observed uplift |
 |---|---|---|---|
-| 0 | 1,920 | +0.0955 | +0.0866 |
-| 1 | 1,920 | +0.0825 | +0.0605 |
-| 2 | 1,920 | +0.0752 | +0.0775 |
-| 3 | 1,920 | +0.0684 | +0.0822 |
-| 4 | 1,920 | +0.0620 | +0.0553 |
-| 5 | 1,920 | +0.0558 | +0.0520 |
-| 6 | 1,920 | +0.0495 | +0.0514 |
-| 7 | 1,920 | +0.0425 | +0.0658 |
-| 8 | 1,920 | +0.0352 | +0.0340 |
-| 9 | 1,920 | +0.0216 | +0.0467 |
+| 0 | 1,920 | +0.1009 | +0.0400 |
+| 1 | 1,920 | +0.0863 | +0.0670 |
+| 2 | 1,920 | +0.0766 | +0.0738 |
+| 3 | 1,920 | +0.0684 | +0.0856 |
+| 4 | 1,920 | +0.0617 | +0.0783 |
+| 5 | 1,920 | +0.0561 | +0.0575 |
+| 6 | 1,920 | +0.0506 | +0.0544 |
+| 7 | 1,920 | +0.0448 | +0.0431 |
+| 8 | 1,920 | +0.0369 | +0.0610 |
+| 9 | 1,920 | +0.0207 | +0.0458 |
 
 Not perfectly monotonic. With roughly 1,920 customers per decile and a rare binary
-outcome, individual deciles carry real sampling noise, but the top two deciles average
-+0.0736 observed uplift against +0.0404 for the bottom two, the gradient the
-ranking predicts.
+outcome, individual deciles carry real sampling noise. In this split the top two average
++0.0535 observed uplift against +0.0534 for the bottom two, so the decile
+comparison itself does not establish a useful ranking gradient.
 
-**Qini coefficient: 47.10** (area between the model's gain curve and random
+**Qini coefficient: 17.84** (area between the model's gain curve and random
 targeting; positive means the ranking beats emailing customers in a random order,
 0 is what a ranking with no real signal would average to).
 
@@ -63,23 +63,25 @@ noise, not a statement about how much a re-trained forest could vary):
 
 | top-k% targeted | incremental visits/customer | 95% CI |
 |---|---|---|
-| 10% | +0.0576 | [+0.0346, +0.0827] |
-| 20% | +0.0489 | [+0.0323, +0.0640] |
-| 30% | +0.0499 | [+0.0371, +0.0622] |
-| 50% | +0.0482 | [+0.0385, +0.0578] |
-| 100% | +0.0407 | [+0.0341, +0.0472] |
+| 10% | +0.0400 | [+0.0049, +0.0775] |
+| 20% | +0.0536 | [+0.0298, +0.0780] |
+| 30% | +0.0603 | [+0.0406, +0.0795] |
+| 50% | +0.0691 | [+0.0542, +0.0835] |
+| 100% | +0.0608 | [+0.0514, +0.0704] |
 
-## Break-even email cost
+## Gross-spend sensitivity
 
 At the top-30% targeting fraction, the expected incremental
-**spend** per customer targeted is **$0.1196**
-(95% CI [$-0.4814, $0.6267]): the revenue side
+**reported spend** per customer targeted is **$0.7816**
+(95% CI [$0.3733, $1.2743]): the gross-spend side
 of the same targeting policy, using the same visit-based ranking rather than a separate
 spend-CATE model (only 578 non-zero spend values total, see
-`reports/data_dictionary.md`). The point estimate clears the assumed
+`reports/data_dictionary.md`). This is not a break-even or profitability result: a
+gross-margin assumption is required before comparing reported spend with the assumed
 $0.10-per-email cost
-(`src/config.py:DEFAULT_EMAIL_COST_USD`, a stated assumption, not fitted) comfortably.
-**The confidence interval crosses zero and runs negative, though**: at this sample size, spend among 30%-of-64,000 customers is too sparse to statistically rule out the segment losing money rather than paying for itself. The visit-based numbers above are the ones this report actually stands behind; this section is a directional read on revenue, not a claim with the same statistical footing.
+(`src/config.py:DEFAULT_EMAIL_COST_USD`). Reported spend may also be top-coded, so this
+section is a sensitivity input rather than a deployment recommendation.
+
 
 ## Three-action policy: no email, mens email, or womens email
 
@@ -93,22 +95,27 @@ only customers whose real (randomised) arm happened to match the recommendation.
 
 | policy | policy value (visit rate) | 95% CI |
 |---|---|---|
-| learned (DRPolicyForest) | 0.1831 | [0.1736, 0.1941] |
-| purchase-history heuristic | 0.1756 | [0.1662, 0.1852] |
-| email everyone (mens creative) | 0.1851 | [0.1752, 0.1957] |
-| email nobody | 0.1061 | [0.0984, 0.1137] |
+| learned (DRPolicyForest) | 0.1838 | [0.1738, 0.1936] |
+| purchase-history heuristic | 0.1814 | [0.1714, 0.1914] |
+| email everyone (mens creative) | 0.1827 | [0.1726, 0.1929] |
+| email nobody | 0.1062 | [0.0981, 0.1141] |
+
+| paired comparison (A - B) | difference | 95% CI |
+|---|---:|---|
+| learned - blanket mens | +0.0011 | [-0.0019, +0.0040] |
+| learned - purchase-history heuristic | +0.0024 | [-0.0079, +0.0135] |
+| learned - email nobody | +0.0776 | [+0.0644, +0.0907] |
 
 `email nobody` recovers the control arm's raw visit rate almost exactly
-(0.1061 vs the true control rate of 0.1062, `reports/data_dictionary.md`),
+(0.1062 vs the true control rate of 0.1062, `reports/data_dictionary.md`),
 the sanity check that the IPW estimator itself is unbiased before trusting it on anything
 more interesting.
 
 **The honest result, stated plainly rather than dressed up: the learned policy does not**
 **clearly beat the simplest baseline that already knew the mens creative works better.**
-Learned policy value 0.1831 vs 0.1851 for blanket mens-emailing everyone, with heavily overlapping confidence intervals: not a result this report can call a win.
-The historical report used marginal-interval overlap to describe comparisons. The implementation
-now reports paired bootstrap differences instead; this static report must be regenerated before
-making a significance claim about policy-versus-policy comparisons.
+Learned policy value 0.1838 vs 0.1827 for blanket mens-emailing everyone, with heavily overlapping confidence intervals: not a result this report can call a win.
+The paired-comparison table below, rather than these marginal intervals, determines
+which policy differences this evaluation can support.
 
 This is a real and explicable finding, not a failed experiment: the heterogeneity section
 above showed the mens creative's effect is positive for almost every segment,
@@ -120,11 +127,11 @@ would show up far more clearly in a setting where some segment is actually hurt 
 default action, which is not the case here. The learned policy still earns its place: it
 correctly identifies that the purchase-history heuristic's core assumption, match the
 creative to what the customer already buys, is wrong on this data (the heuristic
-underperforms blanket mens-emailing by 0.0094
+underperforms blanket mens-emailing by 0.0013
 visit-rate points), and it does so without anyone having to notice that by eye.
 
 The forest recommends the womens creative for
-2,165 of 19,200
+663 of 19,200
 held-out customers and the mens creative for the rest; it never recommends sending no
 email at all in this eval set, since both creatives show a positive effect for every
 segment identified above.

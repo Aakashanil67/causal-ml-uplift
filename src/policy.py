@@ -217,8 +217,10 @@ def append_policy_section(
         "email at all in this eval set, since both creatives show a positive effect for every",
         "segment identified above.",
     ]
-    with open(out_path, "a", encoding="utf-8") as f:
-        f.write("\n".join(lines) + "\n")
+    marker = "## Three-action policy: no email, mens email, or womens email"
+    existing = out_path.read_text(encoding="utf-8") if out_path.exists() else ""
+    prefix = existing.split(marker, maxsplit=1)[0].rstrip()
+    out_path.write_text(prefix + "\n\n" + "\n".join(lines) + "\n", encoding="utf-8")
 
 
 def main() -> None:

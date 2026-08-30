@@ -1,10 +1,10 @@
 # Constructed confounding stress test
 
 Every method so far agreed because Hillstrom is randomised and there was nothing to
-disagree about. This section manufactures real confounding from the same data and checks
-whether each estimator can see through it, against a benchmark we actually know: the
-pooled DML ATE on `visit` from the full, unconfounded RCT, **+6.01pp**
-(`reports/05_dml_ate.md`).
+disagree about. This section constructs observational selection from the same data and
+checks how each estimator responds. The full-RCT DML ATE on `visit`, **+6.01pp**
+(`reports/05_dml_ate.md`), is an experimental reference, not the selected sample's
+known causal truth when effects vary by covariates.
 
 **What this validates and what it doesn't.** Both variants below confound on named,
 real covariates from this dataset. Variant 1 gives every estimator access to the
