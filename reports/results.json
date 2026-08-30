@@ -118,7 +118,7 @@
       "channel"
     ],
     "git_dirty": false,
-    "git_sha": "b63b448bde41",
+    "git_sha": "8f9c47c72cc8",
     "packages": {
       "econml": "0.16.0",
       "lightgbm": "4.7.0",
@@ -127,7 +127,7 @@
       "scikit-learn": "1.5.2"
     },
     "random_seed": 42,
-    "source_sha256": "2d99708931f614744e94835105d5551c8c36a979dc3a66bbd95f55c4c92e7d00"
+    "source_sha256": "86d829b76d3d5030febbe47d54dc0434f5e1f1fb7139c9aa4935e2f78a72664d"
   },
   "policy": {
     "comparisons": [
@@ -220,10 +220,10 @@
   },
   "ranking": {
     "cate_summary": {
-      "max": 0.12915934475560067,
+      "max": 0.12915934475560065,
       "mean": 0.06031053776029973,
-      "min": -0.0072574592599638455,
-      "std": 0.023000337969603015
+      "min": -0.007257459259963842,
+      "std": 0.02300033796960301
     },
     "deciles": [
       {
