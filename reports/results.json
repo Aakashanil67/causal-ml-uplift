@@ -117,8 +117,8 @@
       "zip_code",
       "channel"
     ],
-    "git_dirty": true,
-    "git_sha": "13cac40e152e",
+    "git_dirty": false,
+    "git_sha": "8e035818854e",
     "packages": {
       "econml": "0.16.0",
       "lightgbm": "4.7.0",
@@ -220,9 +220,9 @@
   },
   "ranking": {
     "cate_summary": {
-      "max": 0.12915934475560065,
+      "max": 0.12915934475560067,
       "mean": 0.06031053776029973,
-      "min": -0.007257459259963843,
+      "min": -0.0072574592599638455,
       "std": 0.023000337969603015
     },
     "deciles": [
