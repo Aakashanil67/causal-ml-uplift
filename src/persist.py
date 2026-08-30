@@ -20,12 +20,14 @@ from src.results import build_provenance, validate_provenance
 MODEL_PATH = MODELS_DIR / "causal_forest.joblib"
 
 
-def fit_and_save(df: pd.DataFrame, out_path=MODEL_PATH) -> CausalForestDML:
+def fit_and_save(
+    df: pd.DataFrame, out_path=MODEL_PATH, metadata: dict | None = None
+) -> CausalForestDML:
     from src.cate import fit_causal_forest
 
     cf = fit_causal_forest(df)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump({"model": cf, "metadata": build_provenance()}, out_path)
+    joblib.dump({"model": cf, "metadata": metadata or build_provenance()}, out_path)
     return cf
 
 

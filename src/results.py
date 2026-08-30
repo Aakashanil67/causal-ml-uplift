@@ -122,9 +122,11 @@ def load_results(path: Path = RESULTS_PATH) -> dict:
     return results
 
 
-def save_evaluation_artifacts(payload: dict, path: Path = EVALUATION_ARTIFACT_PATH) -> None:
+def save_evaluation_artifacts(
+    payload: dict, path: Path = EVALUATION_ARTIFACT_PATH, metadata: dict | None = None
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump({"metadata": build_provenance(), "payload": payload}, path, compress=3)
+    joblib.dump({"metadata": metadata or build_provenance(), "payload": payload}, path, compress=3)
 
 
 def load_evaluation_artifacts(path: Path = EVALUATION_ARTIFACT_PATH) -> dict:

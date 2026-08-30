@@ -77,6 +77,7 @@ def _top_k_table(cate, treatment, outcome, n_boot):
 def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) -> dict:
     from src.data_loader import load_hillstrom
 
+    provenance = build_provenance()
     df = load_hillstrom()
     pooled = pooled_ate_table(df)
     per_arm = per_arm_ate_table(df)
@@ -147,7 +148,7 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
     repeated = pd.DataFrame(repeated_rows)
     results = {
         "schema_version": 1,
-        "metadata": build_provenance(),
+        "metadata": provenance,
         "headline": {
             "pooled_ate": records_for_json(pooled),
             "per_arm_ate": records_for_json(per_arm),
@@ -199,8 +200,8 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
         "policy_comparisons": comparisons,
     }
     save_results(results)
-    save_evaluation_artifacts(serving_payload)
-    fit_and_save(df)
+    save_evaluation_artifacts(serving_payload, metadata=provenance)
+    fit_and_save(df, metadata=provenance)
     return results
 
 
