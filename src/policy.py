@@ -56,6 +56,42 @@ def heuristic_recommendations(df: pd.DataFrame) -> np.ndarray:
     )
 
 
+def incremental_net_value(
+    policy_spend: float,
+    no_email_spend: float,
+    contact_rate: float,
+    gross_margin: float,
+    email_cost: float,
+) -> float:
+    """Return incremental contribution per customer under an explicit margin assumption."""
+    if not 0 <= contact_rate <= 1:
+        raise ValueError("contact_rate must be between 0 and 1")
+    if not 0 <= gross_margin <= 1:
+        raise ValueError("gross_margin must be between 0 and 1")
+    if email_cost < 0:
+        raise ValueError("email_cost must be non-negative")
+    return (policy_spend - no_email_spend) * gross_margin - contact_rate * email_cost
+
+
+def break_even_margin(
+    policy_spend: float,
+    no_email_spend: float,
+    contact_rate: float,
+    email_cost: float,
+) -> float | None:
+    """Return the gross margin at which incremental contribution reaches zero."""
+    if not 0 <= contact_rate <= 1:
+        raise ValueError("contact_rate must be between 0 and 1")
+    if email_cost < 0:
+        raise ValueError("email_cost must be non-negative")
+    delta_spend = policy_spend - no_email_spend
+    if delta_spend == 0:
+        return 0.0 if contact_rate == 0 else None
+    if delta_spend < 0:
+        return None
+    return contact_rate * email_cost / delta_spend
+
+
 def ipw_policy_value(
     df: pd.DataFrame, recommended_arm: np.ndarray, outcome_col: str, propensities: dict
 ) -> float:

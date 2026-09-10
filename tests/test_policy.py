@@ -6,12 +6,24 @@ from src.config import ARM_COL, CONTROL_ARM, NOMINAL_PROPENSITIES
 from src.policy import (
     _treatment_name_to_arm,
     bootstrap_policy_difference_ci,
+    break_even_margin,
     dr_policy_value,
     heuristic_recommendations,
+    incremental_net_value,
     ipw_policy_value,
     policy_value_contributions,
     stratified_bootstrap_indices,
 )
+
+
+def test_incremental_net_value_uses_gross_margin_and_contact_cost():
+    assert incremental_net_value(1.42, 0.65, 1.0, 0.30, 0.10) == pytest.approx(0.131)
+
+
+def test_break_even_margin_is_explicit_about_unprofitable_or_zero_contact_cases():
+    assert break_even_margin(1.42, 0.65, 1.0, 0.10) == pytest.approx(0.10 / 0.77)
+    assert break_even_margin(0.65, 0.65, 0.0, 0.10) == 0.0
+    assert break_even_margin(0.60, 0.65, 1.0, 0.10) is None
 
 
 def test_treatment_name_to_arm_maps_none_to_control():

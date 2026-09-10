@@ -56,6 +56,6 @@ TRAIN_FRACTION = 0.7
 EVAL_FRACTION = 0.3
 
 # per-contact email cost: a stated assumption, not a fitted value, because Hillstrom ships no cost
-# data. Configurable per call. reports/07_uplift_policy.md also reports the break-even cost at
-# which top-k targeting stops paying, which is derived from the data rather than assumed.
+# data. Configurable per call. The generated report includes reported-spend sensitivity at explicit
+# gross-margin scenarios; it does not present spend as profit.
 DEFAULT_EMAIL_COST_USD = 0.10

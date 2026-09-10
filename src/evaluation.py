@@ -2,7 +2,7 @@
 
 import numpy as np
 import pandas as pd
-from lightgbm import LGBMClassifier
+from lightgbm import LGBMClassifier, LGBMRegressor
 from sklearn.model_selection import StratifiedKFold
 
 from src.config import ARM_COL, ARMS, NOMINAL_PROPENSITIES, RANDOM_SEED
@@ -19,7 +19,10 @@ def crossfit_arm_outcomes(
 ) -> pd.DataFrame:
     """Cross-fitted estimates of E[Y | X, arm] for every held-out row and action."""
     X = build_covariate_matrix(df).to_numpy()
-    strat_key = df[ARM_COL].astype(str) + "_" + df[outcome_col].astype(str)
+    if df[outcome_col].nunique() <= 2:
+        strat_key = df[ARM_COL].astype(str) + "_" + df[outcome_col].astype(str)
+    else:
+        strat_key = df[ARM_COL]
     folds = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed)
     predictions = pd.DataFrame(index=df.index, columns=ARMS, dtype=float)
 
@@ -27,14 +30,16 @@ def crossfit_arm_outcomes(
         train = df.iloc[train_idx]
         for arm in ARMS:
             arm_mask = train[ARM_COL].to_numpy() == arm
-            model = LGBMClassifier(
-                n_estimators=n_estimators,
-                verbosity=-1,
-                random_state=seed,
-                n_jobs=1,
+            model_class = LGBMClassifier if df[outcome_col].nunique() <= 2 else LGBMRegressor
+            model = model_class(
+                n_estimators=n_estimators, verbosity=-1, random_state=seed, n_jobs=1
             )
             model.fit(X[train_idx][arm_mask], train.loc[arm_mask, outcome_col])
-            predictions.loc[df.index[test_idx], arm] = model.predict_proba(X[test_idx])[:, 1]
+            if df[outcome_col].nunique() <= 2:
+                prediction = model.predict_proba(X[test_idx])[:, 1]
+            else:
+                prediction = model.predict(X[test_idx])
+            predictions.loc[df.index[test_idx], arm] = prediction
     return predictions
 
 
@@ -44,13 +49,14 @@ def evaluate_policies(
     outcome_predictions: pd.DataFrame,
     propensities: dict[str, float] | None = None,
     reference: str = "learned (DRPolicyForest)",
+    outcome_col: str = "visit",
     n_boot: int = 1000,
     seed: int = 0,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """DR policy values and paired differences, bootstrapped within randomized arms."""
     propensity = NOMINAL_PROPENSITIES if propensities is None else propensities
     contributions = {
-        name: dr_policy_contributions(df, rec, "visit", propensity, outcome_predictions)
+        name: dr_policy_contributions(df, rec, outcome_col, propensity, outcome_predictions)
         for name, rec in policies.items()
     }
     draws = stratified_bootstrap_indices(df.reset_index(drop=True), n_boot, seed)

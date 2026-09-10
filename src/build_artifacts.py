@@ -21,7 +21,13 @@ from src.dml_ate import per_arm_ate_table, pooled_ate_table
 from src.evaluation import crossfit_arm_outcomes, evaluate_policies
 from src.interactions import interaction_test
 from src.persist import fit_and_save
-from src.policy import fit_policy_forest, heuristic_recommendations, policy_forest_recommendations
+from src.policy import (
+    break_even_margin,
+    fit_policy_forest,
+    heuristic_recommendations,
+    incremental_net_value,
+    policy_forest_recommendations,
+)
 from src.results import build_provenance, save_evaluation_artifacts, save_results
 from src.uplift import (
     bootstrap_normalized_qini_ci,
@@ -145,6 +151,33 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
         n_boot=max(200, n_boot // 5),
         seed=3,
     )
+    spend_predictions = crossfit_arm_outcomes(eval_df, outcome_col="spend")
+    spend_values, spend_comparisons = evaluate_policies(
+        eval_df,
+        policies,
+        spend_predictions,
+        propensities=NOMINAL_PROPENSITIES,
+        outcome_col="spend",
+        n_boot=n_boot,
+        seed=4,
+    )
+    learned_spend = float(spend_values.loc["learned (DRPolicyForest)", "value"])
+    no_email_spend = float(spend_values.loc["email nobody", "value"])
+    contact_rate = float(np.mean(learned != CONTROL_ARM))
+    margin_sensitivity = []
+    for margin in (0.25, 0.50, 1.00):
+        margin_sensitivity.append(
+            {
+                "gross_margin": margin,
+                "incremental_net_value": incremental_net_value(
+                    learned_spend,
+                    no_email_spend,
+                    contact_rate,
+                    margin,
+                    0.10,
+                ),
+            }
+        )
 
     repeated = pd.DataFrame(repeated_rows)
     results = {
@@ -203,6 +236,17 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
                 for arm in ARMS
             },
             "conclusion": policy_conclusion(comparisons),
+        },
+        "reported_spend_sensitivity": {
+            "analysis": "evaluation of a visit-optimised policy; reported spend is not profit",
+            "values": records_for_json(spend_values),
+            "comparisons": records_for_json(spend_comparisons),
+            "contact_rate": contact_rate,
+            "email_cost_usd": 0.10,
+            "break_even_gross_margin": break_even_margin(
+                learned_spend, no_email_spend, contact_rate, 0.10
+            ),
+            "margin_sensitivity": margin_sensitivity,
         },
     }
     serving_payload = {
