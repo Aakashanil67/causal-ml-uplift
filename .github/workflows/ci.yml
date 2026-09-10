@@ -9,6 +9,9 @@ on:
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
+    concurrency:
+      group: ci-${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
 
@@ -18,6 +21,8 @@ jobs:
           cache: pip
 
       - run: pip install -r requirements.txt
+
+      - run: pip check
 
       - run: ruff check .
       - run: ruff format --check .
