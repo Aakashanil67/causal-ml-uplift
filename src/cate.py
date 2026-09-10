@@ -29,7 +29,20 @@ def split_train_eval(
     return df.loc[train_idx].reset_index(drop=True), df.loc[eval_idx].reset_index(drop=True)
 
 
-def fit_causal_forest(train: pd.DataFrame, seed: int = RANDOM_SEED) -> CausalForestDML:
+def fit_causal_forest(
+    train: pd.DataFrame,
+    seed: int = RANDOM_SEED,
+    *,
+    n_estimators: int = 500,
+    min_samples_leaf: int = 50,
+    max_depth: int | None = None,
+) -> CausalForestDML:
+    if n_estimators <= 0:
+        raise ValueError("n_estimators must be positive")
+    if min_samples_leaf <= 0:
+        raise ValueError("min_samples_leaf must be positive")
+    if max_depth is not None and max_depth <= 0:
+        raise ValueError("max_depth must be positive when supplied")
     X = build_covariate_matrix(train).to_numpy()
     T = train[TREATMENT_COL].to_numpy()
     Y = train["visit"].to_numpy(dtype=float)
@@ -38,8 +51,9 @@ def fit_causal_forest(train: pd.DataFrame, seed: int = RANDOM_SEED) -> CausalFor
         model_t=LGBMClassifier(n_estimators=100, verbose=-1, random_state=seed),
         discrete_treatment=True,
         cv=3,
-        n_estimators=500,
-        min_samples_leaf=50,
+        n_estimators=n_estimators,
+        min_samples_leaf=min_samples_leaf,
+        max_depth=max_depth,
         random_state=seed,
     )
     cf.fit(Y, T, X=X)
@@ -59,10 +73,7 @@ def heterogeneity_by_bin(eval_df: pd.DataFrame, cate: np.ndarray, covariate: str
 
 
 def heterogeneity_by_purchase_history(eval_df: pd.DataFrame, cate: np.ndarray) -> pd.DataFrame:
-    """The headline heterogeneity finding: `mens`/`womens` purchase-history interacts with
-    treatment far more strongly than `recency`/`history` do — confirmed with an OLS interaction
-    test in `src.interactions` before trusting the forest's split, rather than being read directly
-    from the CATE distribution."""
+    """Summarise held-out profile-level CATEs by prior purchase category."""
     tmp = eval_df.copy()
     tmp["cate"] = cate
     return tmp.groupby(["mens", "womens"])["cate"].agg(["mean", "count"])

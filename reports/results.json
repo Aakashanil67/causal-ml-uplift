@@ -1,5 +1,11 @@
 {
   "headline": {
+    "deduplicated_visit_sensitivity": {
+      "deduplicated_rows": 57438,
+      "deduplicated_visit_difference": 0.0621930114662312,
+      "full_rows": 64000,
+      "full_visit_difference": 0.06088195726098464
+    },
     "per_arm_ate": [
       {
         "arm": "Mens E-Mail",
@@ -66,43 +72,68 @@
     ]
   },
   "interactions": {
-    "joint_p_value": 1.0127106430818269e-10,
-    "terms": [
+    "analysis": "post-hoc held-out interaction audit",
+    "contrasts": [
       {
-        "ci_high": 0.057165148614279494,
-        "ci_low": 0.00948638048567433,
-        "estimate": 0.03332576454997691,
-        "p_holm": 0.018437905559718026,
-        "p_value": 0.006145968519906009,
-        "std_error": 0.012163174554402327,
-        "term": "mens"
+        "ci_high": 0.041669635584785286,
+        "ci_low": 0.0012308923193555914,
+        "contrast": "womens only - mens only",
+        "estimate": 0.02145026395207044,
+        "p_holm": 0.1127747338930931,
+        "p_value": 0.03759157796436437,
+        "std_error": 0.010316195497571727
       },
       {
-        "ci_high": 0.08977579821556243,
-        "ci_low": 0.0420756142731389,
-        "estimate": 0.06592570624435067,
-        "p_holm": 2.4151826584195336e-07,
-        "p_value": 6.037956646048834e-08,
-        "std_error": 0.01216863787260289,
-        "term": "womens"
+        "ci_high": 0.1595706901514297,
+        "ci_low": 0.07636401028004838,
+        "contrast": "both - mens only",
+        "estimate": 0.11796735021573904,
+        "p_holm": 1.0944837059133173e-07,
+        "p_value": 2.7362092647832933e-08,
+        "std_error": 0.021226583888200236
       },
       {
-        "ci_high": 0.0014738048155633486,
-        "ci_low": -0.0017262504475205236,
-        "estimate": -0.0001262228159785874,
+        "ci_high": 0.002455095620779653,
+        "ci_low": -0.003354415114103721,
+        "contrast": "recency",
+        "estimate": -0.000449659746662034,
         "p_holm": 1.0,
-        "p_value": 0.8771229216776059,
-        "std_error": 0.0008163556290639777,
-        "term": "recency"
+        "p_value": 0.7615813389342931,
+        "std_error": 0.0014820452775428665
       },
       {
-        "ci_high": 2.0525287411022022e-05,
-        "ci_low": -2.9952512093879143e-05,
-        "estimate": -4.71361234142856e-06,
+        "ci_high": 3.176548132379856e-05,
+        "ci_low": -5.618384585484115e-05,
+        "contrast": "history",
+        "estimate": -1.22091822655213e-05,
         "p_holm": 1.0,
-        "p_value": 0.7143333488559946,
-        "std_error": 1.2877226291672604e-05,
-        "term": "history"
+        "p_value": 0.5863266089737547,
+        "std_error": 2.2436465127005596e-05
+      }
+    ],
+    "joint_p_value": 8.545079719851878e-07,
+    "n": 19200,
+    "segment_effects": [
+      {
+        "ci_high": 0.054390018736203985,
+        "ci_low": 0.026112695786047305,
+        "estimate": 0.04025135726112564,
+        "segment": "mens only",
+        "std_error": 0.007213735347487146
+      },
+      {
+        "ci_high": 0.07635137620524442,
+        "ci_low": 0.047051866221147744,
+        "estimate": 0.061701621213196084,
+        "segment": "womens only",
+        "std_error": 0.0074745021375921894
+      },
+      {
+        "ci_high": 0.1966789441261027,
+        "ci_low": 0.11975847082762665,
+        "estimate": 0.15821870747686467,
+        "segment": "both",
+        "std_error": 0.019622930294948
       }
     ]
   },
@@ -117,8 +148,8 @@
       "zip_code",
       "channel"
     ],
-    "git_dirty": false,
-    "git_sha": "8f9c47c72cc8",
+    "git_dirty": true,
+    "git_sha": "57d15d2911e4",
     "packages": {
       "econml": "0.16.0",
       "lightgbm": "4.7.0",
@@ -127,7 +158,7 @@
       "scikit-learn": "1.5.2"
     },
     "random_seed": 42,
-    "source_sha256": "86d829b76d3d5030febbe47d54dc0434f5e1f1fb7139c9aa4935e2f78a72664d"
+    "source_sha256": "5dcabb5b07f9c892470fdb973cad724f6154cdda1f04e16cbc68094282f9990e"
   },
   "policy": {
     "comparisons": [
@@ -138,10 +169,16 @@
         "difference": 0.0012586563744212617
       },
       {
-        "ci_high": 0.0110518228810939,
-        "ci_low": -0.007870800148806926,
+        "ci_high": 0.04269588270857457,
+        "ci_low": 0.01761961343823582,
+        "comparison": "learned (DRPolicyForest) - email everyone (womens creative)",
+        "difference": 0.03025623050076009
+      },
+      {
+        "ci_high": 0.005319916610053535,
+        "ci_low": -0.010173142079757719,
         "comparison": "learned (DRPolicyForest) - purchase-history heuristic",
-        "difference": 0.0019050342038497436
+        "difference": -0.002534202379646373
       },
       {
         "ci_high": 0.08771449216739129,
@@ -170,10 +207,16 @@
         "value": 0.1809936852773626
       },
       {
-        "ci_high": 0.18947843858505325,
-        "ci_low": 0.17126881354186818,
+        "ci_high": 0.1605717387052275,
+        "ci_low": 0.1440674938929729,
+        "policy": "email everyone (womens creative)",
+        "value": 0.15198668850015815
+      },
+      {
+        "ci_high": 0.19438034210171726,
+        "ci_low": 0.17541486151684993,
         "policy": "purchase-history heuristic",
-        "value": 0.1803392296037827
+        "value": 0.18478332173031561
       },
       {
         "ci_high": 0.11328039857387905,
@@ -191,6 +234,68 @@
       "Mens E-Mail": 18537,
       "Womens E-Mail": 663
     },
+    "recommendation_shares": {
+      "Mens E-Mail": 0.96546875,
+      "No E-Mail": 0.0,
+      "Womens E-Mail": 0.03453125
+    },
+    "split_sensitivity": [
+      {
+        "blanket_mens_value": 0.18099165300318248,
+        "learned_minus_blanket_mens": 0.0012586563744212617,
+        "learned_value": 0.18225030937760378,
+        "recommendation_shares": {
+          "Mens E-Mail": 0.96546875,
+          "No E-Mail": 0.0,
+          "Womens E-Mail": 0.03453125
+        },
+        "seed": 42
+      },
+      {
+        "blanket_mens_value": 0.18430926303726292,
+        "learned_minus_blanket_mens": -0.0027873207577787315,
+        "learned_value": 0.18152194227948415,
+        "recommendation_shares": {
+          "Mens E-Mail": 0.8652604166666666,
+          "No E-Mail": 0.0,
+          "Womens E-Mail": 0.13473958333333333
+        },
+        "seed": 7
+      },
+      {
+        "blanket_mens_value": 0.18289244628742543,
+        "learned_minus_blanket_mens": 0.0005841294346664428,
+        "learned_value": 0.1834765757220919,
+        "recommendation_shares": {
+          "Mens E-Mail": 0.95640625,
+          "No E-Mail": 0.0,
+          "Womens E-Mail": 0.04359375
+        },
+        "seed": 19
+      },
+      {
+        "blanket_mens_value": 0.18248974602077414,
+        "learned_minus_blanket_mens": -0.0020834284344710494,
+        "learned_value": 0.18040631758630313,
+        "recommendation_shares": {
+          "Mens E-Mail": 0.7923958333333333,
+          "No E-Mail": 0.0,
+          "Womens E-Mail": 0.20760416666666667
+        },
+        "seed": 73
+      },
+      {
+        "blanket_mens_value": 0.18021013958015242,
+        "learned_minus_blanket_mens": 0.0012017240853331272,
+        "learned_value": 0.1814118636654855,
+        "recommendation_shares": {
+          "Mens E-Mail": 0.9809895833333333,
+          "No E-Mail": 0.0,
+          "Womens E-Mail": 0.019010416666666665
+        },
+        "seed": 101
+      }
+    ],
     "values": [
       {
         "ci_high": 0.19156640993895727,
@@ -205,10 +310,16 @@
         "value": 0.18099165300318248
       },
       {
-        "ci_high": 0.18999189982744533,
-        "ci_low": 0.1706263951383255,
+        "ci_high": 0.16154775089405018,
+        "ci_low": 0.14332215199149018,
+        "policy": "email everyone (womens creative)",
+        "value": 0.15199407887684366
+      },
+      {
+        "ci_high": 0.19403534573996045,
+        "ci_low": 0.175069754867652,
         "policy": "purchase-history heuristic",
-        "value": 0.18034527517375398
+        "value": 0.1847845117572501
       },
       {
         "ci_high": 0.1150713789654324,
@@ -220,10 +331,10 @@
   },
   "ranking": {
     "cate_summary": {
-      "max": 0.12915934475560065,
+      "max": 0.12915934475560067,
       "mean": 0.06031053776029973,
-      "min": -0.007257459259963842,
-      "std": 0.02300033796960301
+      "min": -0.007257459259963843,
+      "std": 0.023000337969603008
     },
     "deciles": [
       {
@@ -284,7 +395,33 @@
         "decile": 9,
         "n": 1920,
         "observed_uplift": 0.045837868742509696,
-        "pred_cate_mean": 0.020710895435530795
+        "pred_cate_mean": 0.020710895435530792
+      }
+    ],
+    "forest_sensitivity": [
+      {
+        "label": "smaller leaves",
+        "max_depth": null,
+        "min_samples_leaf": 25,
+        "normalized_qini": 0.00568062919645202
+      },
+      {
+        "label": "primary",
+        "max_depth": null,
+        "min_samples_leaf": 50,
+        "normalized_qini": 0.011114646791712637
+      },
+      {
+        "label": "larger leaves",
+        "max_depth": null,
+        "min_samples_leaf": 100,
+        "normalized_qini": 0.014732794572624922
+      },
+      {
+        "label": "depth capped",
+        "max_depth": 5,
+        "min_samples_leaf": 50,
+        "normalized_qini": 0.019420296195403194
       }
     ],
     "gross_spend_top_30": {
@@ -318,25 +455,41 @@
       }
     ],
     "raw_qini": 17.844097338900895,
+    "repeated_split_note": "repeated sample splits are sensitivity evidence, not independent replications",
     "repeated_splits": [
       {
+        "n_eval": 19200,
         "normalized_qini": 0.011114646791712637,
+        "qini_ci_high": 0.033035927889890335,
+        "qini_ci_low": -0.013573980419781825,
         "seed": 42
       },
       {
+        "n_eval": 19200,
         "normalized_qini": 0.019561709294538165,
+        "qini_ci_high": 0.04178384762943815,
+        "qini_ci_low": -0.005824257003618778,
         "seed": 7
       },
       {
+        "n_eval": 19200,
         "normalized_qini": 0.02150335093666316,
+        "qini_ci_high": 0.04251133008081196,
+        "qini_ci_low": -0.003443839093020362,
         "seed": 19
       },
       {
+        "n_eval": 19200,
         "normalized_qini": 0.017147760830402897,
+        "qini_ci_high": 0.03995019273095443,
+        "qini_ci_low": -0.008455194986580306,
         "seed": 73
       },
       {
+        "n_eval": 19200,
         "normalized_qini": 0.03595608547651271,
+        "qini_ci_high": 0.05598278968931446,
+        "qini_ci_low": 0.009778317788952086,
         "seed": 101
       }
     ],
@@ -379,5 +532,178 @@
       }
     ]
   },
-  "schema_version": 1
+  "reported_spend_sensitivity": {
+    "analysis": "evaluation of a visit-optimised policy; reported spend is not profit",
+    "break_even_gross_margin": 0.13771820352694003,
+    "comparisons": [
+      {
+        "ci_high": 0.02231657375421147,
+        "ci_low": -0.15680653482458948,
+        "comparison": "learned (DRPolicyForest) - email everyone (mens creative)",
+        "difference": -0.05643071695052422
+      },
+      {
+        "ci_high": 0.6293025315837328,
+        "ci_low": -0.4277736695305599,
+        "comparison": "learned (DRPolicyForest) - email everyone (womens creative)",
+        "difference": 0.10804079726477797
+      },
+      {
+        "ci_high": 0.1767926545546448,
+        "ci_low": -0.3233335293222031,
+        "comparison": "learned (DRPolicyForest) - purchase-history heuristic",
+        "difference": -0.08162646554072825
+      },
+      {
+        "ci_high": 1.2554660228241403,
+        "ci_low": 0.23792629775632818,
+        "comparison": "learned (DRPolicyForest) - email nobody",
+        "difference": 0.726120421549344
+      }
+    ],
+    "contact_rate": 1.0,
+    "email_cost_usd": 0.1,
+    "margin_sensitivity": [
+      {
+        "gross_margin": 0.25,
+        "incremental_net_value": 0.08153010538733593
+      },
+      {
+        "gross_margin": 0.5,
+        "incremental_net_value": 0.2630602107746719
+      },
+      {
+        "gross_margin": 1.0,
+        "incremental_net_value": 0.6261204215493438
+      }
+    ],
+    "values": [
+      {
+        "ci_high": 1.698679607546052,
+        "ci_low": 0.8452257112742376,
+        "policy": "learned (DRPolicyForest)",
+        "value": 1.2475017551145366
+      },
+      {
+        "ci_high": 1.7631233252596668,
+        "ci_low": 0.8948821453532003,
+        "policy": "email everyone (mens creative)",
+        "value": 1.303932472065061
+      },
+      {
+        "ci_high": 1.5321039450482559,
+        "ci_low": 0.7823350529389929,
+        "policy": "email everyone (womens creative)",
+        "value": 1.1394609578497588
+      },
+      {
+        "ci_high": 1.7866070032137964,
+        "ci_low": 0.9168380460642997,
+        "policy": "purchase-history heuristic",
+        "value": 1.329128220655265
+      },
+      {
+        "ci_high": 0.7866907322539187,
+        "ci_low": 0.26872413726793654,
+        "policy": "email nobody",
+        "value": 0.5213813335651929
+      }
+    ]
+  },
+  "schema_version": 2,
+  "simulation": {
+    "analysis": "semi-synthetic Monte Carlo stress test with known data-generating effects",
+    "rows": [
+      {
+        "bias": -0.0021242994437296776,
+        "confounding_strength": 0.0,
+        "coverage": 1.0,
+        "estimator": "adjusted_dml",
+        "index": 0,
+        "mean_estimate": 0.07607009937055849,
+        "n_runs": 10,
+        "rmse": 0.013619493775695907
+      },
+      {
+        "bias": -0.0006104942951953102,
+        "confounding_strength": 0.0,
+        "coverage": NaN,
+        "estimator": "naive",
+        "index": 1,
+        "mean_estimate": 0.07758390451909285,
+        "n_runs": 10,
+        "rmse": 0.017462406923111712
+      },
+      {
+        "bias": -0.0012297067457870438,
+        "confounding_strength": 0.0,
+        "coverage": 1.0,
+        "estimator": "omitted_confounder_dml",
+        "index": 2,
+        "mean_estimate": 0.07696469206850112,
+        "n_runs": 10,
+        "rmse": 0.019366353746011165
+      },
+      {
+        "bias": 0.0022072057060793576,
+        "confounding_strength": 0.75,
+        "coverage": 1.0,
+        "estimator": "adjusted_dml",
+        "index": 3,
+        "mean_estimate": 0.08040160452036751,
+        "n_runs": 10,
+        "rmse": 0.016286105215963048
+      },
+      {
+        "bias": 0.06889912051369027,
+        "confounding_strength": 0.75,
+        "coverage": NaN,
+        "estimator": "naive",
+        "index": 4,
+        "mean_estimate": 0.14709351932797843,
+        "n_runs": 10,
+        "rmse": 0.0703417671453557
+      },
+      {
+        "bias": 0.06487848509366378,
+        "confounding_strength": 0.75,
+        "coverage": 0.0,
+        "estimator": "omitted_confounder_dml",
+        "index": 5,
+        "mean_estimate": 0.14307288390795195,
+        "n_runs": 10,
+        "rmse": 0.06685229519357497
+      },
+      {
+        "bias": -0.017772367955113656,
+        "confounding_strength": 1.5,
+        "coverage": 1.0,
+        "estimator": "adjusted_dml",
+        "index": 6,
+        "mean_estimate": 0.060422030859174504,
+        "n_runs": 10,
+        "rmse": 0.024498654461763258
+      },
+      {
+        "bias": 0.1134215373046461,
+        "confounding_strength": 1.5,
+        "coverage": NaN,
+        "estimator": "naive",
+        "index": 7,
+        "mean_estimate": 0.1916159361189343,
+        "n_runs": 10,
+        "rmse": 0.11444079563078717
+      },
+      {
+        "bias": 0.10934997239044959,
+        "confounding_strength": 1.5,
+        "coverage": 0.0,
+        "estimator": "omitted_confounder_dml",
+        "index": 8,
+        "mean_estimate": 0.18754437120473774,
+        "n_runs": 10,
+        "rmse": 0.11098621341838592
+      }
+    ]
+  }
 }

@@ -27,6 +27,18 @@ def test_streamlit_request_path_does_not_fit_causal_models():
     assert "fit_policy_forest" not in called
 
 
+def test_policy_tab_exposes_manifest_backed_decision_controls():
+    source = (Path(__file__).resolve().parent.parent / "app" / "simulator.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert '"email everyone (womens creative)"' in source or "recommendation_shares" in source
+    assert "Assumed gross margin" in source
+    assert "Cost per email" in source
+    assert "reported and capped" in source
+    assert "not profit" in source
+
+
 @pytest.mark.slow
 def test_app_runs_end_to_end_without_exceptions():
     # Exercises both tabs against the committed artifacts. This remains marked slow because
@@ -49,3 +61,6 @@ def test_app_runs_end_to_end_without_exceptions():
     assert metrics["Incremental visits per customer emailed"] == "+0.0603"
     warnings = [item.value for item in at.warning]
     assert any("Normalized Qini" in text and "includes zero" in text for text in warnings)
+    assert any(item.label == "Assumed gross margin" for item in at.get("slider"))
+    assert any(item.label == "Cost per email" for item in at.get("number_input"))
+    assert any("reported and capped" in text and "not profit" in text for text in warnings)

@@ -85,8 +85,8 @@ def _validate_schema(df: pd.DataFrame) -> None:
     if unknown_arms:
         raise ValueError(f"Unexpected arm labels: {unknown_arms}")
     # conversion is a strict subset of visit in the published data (every buyer visited first);
-    # a downstream module (naive.py) relies on this to justify treating visit as the well-powered
-    # outcome and conversion/spend as the sparse ones.
+    # downstream modules use this to distinguish the better-populated visit outcome from the
+    # sparse conversion/spend outcomes.
     if ((df["conversion"] == 1) & (df["visit"] == 0)).any():
         raise ValueError("Found conversion=1 with visit=0 — conversion no longer implies visit.")
 

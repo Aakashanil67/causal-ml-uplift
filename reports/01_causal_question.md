@@ -1,11 +1,11 @@
 # The causal question
 
-Does sending a customer a marketing email cause them to visit the site, buy, and spend, or would
+Does assignment to a marketing email cause a customer to visit the site, buy, and spend, or would
 they have done the same thing anyway? Hillstrom's data lets this be answered without the usual
 hedge, because the "would have done it anyway" group is not estimated: it was built. MineThatData
 randomly split 64,000 customers who had purchased in the past twelve months into three near-equal
 groups before the campaign ran (21,306 No E-Mail, 21,307 Mens E-Mail, 21,387 Womens E-Mail), so any
-post-campaign difference between them is the causal effect of the email, not a difference in who
+post-campaign difference between them is the intention-to-treat effect of assignment to the email, not a difference in who
 the customers already were. `reports/02_naive_estimate.md` checks that claim directly rather than
 assuming it.
 
@@ -53,7 +53,11 @@ email targeted at the 32,144 `newbie` accounts would tie that variable to both a
 how engaged a first-year customer already is, before any email is sent.
 
 None of those edges exist in this graph, and the balance check in `reports/02_naive_estimate.md`
-is the empirical test of whether that claim actually holds in the data as delivered, rather than
+is a finite-sample sanity check consistent with the documented randomisation, rather than proof of
+the assignment mechanism. The analysis assumes SUTVA/no interference, well-defined creative
+versions and independent customer rows. Household identifiers, delivery, opens and clicks are
+unavailable, so the estimand is assignment, not delivery, opening, reading or clicking. The check
+of whether that claim actually holds in the data as delivered, rather than
 just in the paragraph above. `src/confounded.py` builds a second, deliberately confounded version
 of this same dataset by re-introducing exactly this kind of `history`/`recency` → treatment edge,
 so that the difference the randomisation makes can be shown as a number rather than only argued in

@@ -8,7 +8,7 @@ ATE averages the effect over the target population; ATT averages it over treated
 
 ## 2. What's the difference between a confounder, a mediator, and a collider, and why does it matter which one you control for?
 
-A confounder causes both treatment and outcome; not controlling for it biases the estimate, which is exactly what `src/confounded.py` demonstrates on purpose. A mediator sits on the causal path between treatment and outcome (`recency`/`history` don't mediate anything here, but `visit` plausibly mediates `treatment → conversion`); controlling for a mediator blocks part of the real effect and understates it, which is why `reports/01_causal_question.md` explicitly does not condition on `visit` when estimating the effect on `conversion`. A collider is caused by both treatment and outcome (or by two things you're conditioning on); controlling for a collider *induces* a spurious association where none existed. This project's DAG has no colliders by design, but a subset-refuter or an analyst filtering the data on a post-treatment variable would be creating one without realising it.
+A confounder causes both treatment and outcome; not controlling for it biases the estimate, which is exactly what `src/confounded.py` demonstrates on purpose. A mediator sits on the causal path between treatment and outcome (`recency`/`history` don't mediate anything here, but `visit` plausibly mediates `treatment → conversion`); controlling for a mediator blocks part of the real effect and understates it, which is why `reports/01_causal_question.md` explicitly does not condition on `visit` when estimating the effect on `conversion`. A collider is caused by two variables that point into it; each observed outcome here is a collider of treatment and its baseline causes. The analysis does not condition on those outcomes. Conditioning on `visit` when estimating the total conversion effect would block mediation, while collider bias additionally requires a relevant common-cause structure and must not be asserted automatically.
 
 ## 3. Why does cross-fitting matter for DML, and what breaks without it?
 
@@ -44,7 +44,7 @@ The corrected top-30% estimate is $0.7816 in reported gross spend per targeted c
 
 ## 11. What's the Qini coefficient, and why compute it by hand instead of using an existing library?
 
-Raw Qini is the area between cumulative incremental gain under the model ranking and random targeting; here it is 17.84, which depends on sample size. The normalized score is 0.0111 [-0.0114, 0.0331]. Five honest splits range from 0.0111 to 0.0360. The primary interval includes zero, so a positive raw area is not enough to claim a deployment-quality ranking.
+Raw Qini is the area between cumulative incremental gain under the model ranking and random targeting; here it is 17.84, which depends on sample size. The normalized score is 0.0111 [-0.0114, 0.0331]. Five honest sample splits range from 0.0111 to 0.0360; these are sensitivity evidence, not independent replications. The primary interval is conditional on the fitted ranking and includes zero, so a positive raw area is not enough to claim a deployment-quality ranking.
 
 ## 12. How do you know your covariate balance table isn't just something you expected to see on an RCT?
 

@@ -16,7 +16,7 @@ from src.results import (
 @pytest.fixture
 def valid_results():
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "metadata": {
             "data_sha256": "abc123",
             "feature_columns": ["recency", "history"],
@@ -27,9 +27,16 @@ def valid_results():
             "packages": {"scikit-learn": "1.5.2"},
         },
         "headline": {"visit_ate": 0.0601},
-        "interactions": {"joint_p_value": 0.001, "terms": []},
+        "interactions": {
+            "analysis": "post-hoc held-out interaction audit",
+            "joint_p_value": 0.001,
+            "segment_effects": [],
+            "contrasts": [],
+        },
         "ranking": {"normalized_qini": 0.02, "repeated_splits": []},
         "policy": {"values": [], "comparisons": []},
+        "reported_spend_sensitivity": {"values": []},
+        "simulation": {"rows": []},
     }
 
 
@@ -56,6 +63,20 @@ def test_results_reject_unknown_schema_version(valid_results):
     valid_results["schema_version"] = 99
 
     with pytest.raises(ValueError, match="schema version"):
+        validate_results(valid_results)
+
+
+def test_results_rejects_schema_one(valid_results):
+    valid_results["schema_version"] = 1
+
+    with pytest.raises(ValueError, match="schema version"):
+        validate_results(valid_results)
+
+
+def test_results_rejects_old_interaction_contract(valid_results):
+    del valid_results["interactions"]["contrasts"]
+
+    with pytest.raises(ValueError, match="interactions missing"):
         validate_results(valid_results)
 
 

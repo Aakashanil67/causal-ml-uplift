@@ -2,8 +2,9 @@
 networkx DiGraph directly, and the figure is drawn with matplotlib instead of graphviz.
 
 Treatment has no parents by construction — this is the graph's one substantive claim, and it is
-true here only because `segment` was randomly assigned. `src/confounded.py` builds a second graph
-where that assumption is deliberately violated, to show what changes when it doesn't hold.
+true here only because `segment` was randomly assigned. Each outcome also has incoming edges from
+treatment and baseline causes, so it is a collider if an analysis conditions on that outcome.
+`src/confounded.py` builds a second graph where random assignment is deliberately violated.
 """
 
 import matplotlib.pyplot as plt

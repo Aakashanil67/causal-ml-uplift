@@ -52,6 +52,23 @@ def test_cate_shape_matches_eval_set(cate_eval):
     assert not np.isnan(cate).any()
 
 
+def test_fit_causal_forest_exposes_explicit_tree_hyperparameters(split):
+    train, _eval_df = split
+    forest = fit_causal_forest(train, n_estimators=40, min_samples_leaf=12, max_depth=4)
+
+    assert forest.n_estimators == 40
+    assert forest.min_samples_leaf == 12
+    assert forest.max_depth == 4
+
+
+@pytest.mark.parametrize("kwargs", [{"n_estimators": 0}, {"min_samples_leaf": 0}])
+def test_fit_causal_forest_rejects_invalid_hyperparameters(split, kwargs):
+    train, _eval_df = split
+
+    with pytest.raises(ValueError):
+        fit_causal_forest(train, **kwargs)
+
+
 def test_mean_cate_close_to_pooled_ate_benchmark(cate_eval):
     _eval_df, cate = cate_eval
     # pooled DML ATE on visit is +0.0601 (reports/05_dml_ate.md); the CATE mean on a held-out

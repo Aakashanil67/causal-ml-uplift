@@ -1,6 +1,6 @@
 # Causal ML: what actually works?
 
-## Estimating who a marketing email persuades, on a randomised experiment, with constructed stress tests and refutation checks
+## Can causal ML find deployable treatment-effect heterogeneity, or only a reliable average effect?
 
 Hillstrom's 64,000-customer randomised experiment identifies a clear average result: assignment to either email raises the two-week visit rate by 6.01% [5.48%, 6.55%]. The individual-targeting result is weaker. Normalized Qini is 0.0111 [-0.0114, 0.0331], and the learned policy's advantage over blanket mens emailing is +0.0013 [-0.0014, +0.0040]. Neither interval supports personalised deployment. The decision supported by this campaign is blanket mens emailing, while the causal-ML work diagnoses what a better follow-up experiment must change.
 
@@ -36,11 +36,11 @@ Every method above agreed because there was nothing to disagree about. `reports/
 
 ## 5. Heterogeneity: who the email actually helps
 
-The causal forest estimates profile-level conditional average effects on `visit`. I did not treat its segments as evidence on their own. A pre-specified HC1-robust interaction regression gives treatment × `mens` +0.0333 (Holm p=0.0184) and treatment × `womens` +0.0659 (Holm p=2.42e-07). Recency and history both have adjusted p-values of 1.000. The joint Wald p-value is 1.01e-10. Purchase history therefore supports a segment-level interpretation; recency and prior spend do not.
+The causal forest estimates profile-level conditional average effects on `visit`. I did not treat its segments as evidence on their own. A post-hoc held-out HC1-robust audit estimates +0.0403 for mens-only, +0.0617 for womens-only and +0.1582 for both-category customers. The womens-only minus mens-only contrast has Holm p=0.113; the joint Wald p-value is 8.55e-07. This is exploratory evidence of segment differences, not a person-level causal effect.
 
 ## 6. Uplift ranking and targeting economics
 
-The primary split's normalized Qini is 0.0111 [-0.0114, 0.0331]. Five honest splits are all positive, but range from 0.0111 to 0.0360; the primary bootstrap interval still includes zero. That is weak ranking evidence. The top-30% pooled-mixture diagnostic estimates +0.0603 visits per emailed customer, but it does not tell a marketer which creative to send. The three-action analysis answers that separate question.
+The primary split's normalized Qini is 0.0111 [-0.0114, 0.0331]. Five repeated sample splits are all positive in this run, but range from 0.0111 to 0.0360; the primary fixed-model conditional bootstrap interval still includes zero. That is weak ranking evidence. The top-30% pooled-mixture diagnostic estimates +0.0603 visits per emailed customer, but it does not tell a marketer which creative to send. The three-action analysis answers that separate question.
 
 ## 7. Three actions, not two: an honest result
 
@@ -78,4 +78,4 @@ Using Double Machine Learning to estimate heterogeneous treatment effects, and v
 - Microsoft Research, [EconML 0.16 documentation](https://econml.azurewebsites.net/), including `CausalForestDML` and `DRPolicyForest`.
 ---
 
-**Repository**: [github.com/Aakashanil67/causal-ml-uplift](https://github.com/Aakashanil67/causal-ml-uplift) · **Live simulator**: see README · **Full reports**: `reports/01` through `reports/09`, this document synthesises all of them; none of the numbers above are restated from memory, each is sourced to the report that first computed it.
+**Repository**: [github.com/Aakashanil67/causal-ml-uplift](https://github.com/Aakashanil67/causal-ml-uplift) · **Live simulator**: see README · **Full reports**: `reports/01` through `reports/08`, this document synthesises all of them; none of the numbers above are restated from memory, each is sourced to the report that first computed it.

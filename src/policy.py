@@ -46,13 +46,50 @@ def policy_forest_recommendations(pf: DRPolicyForest, df: pd.DataFrame) -> np.nd
 
 
 def heuristic_recommendations(df: pd.DataFrame) -> np.ndarray:
-    """The obvious rule a marketer would try without any modelling: match the creative to the
-    customer's own purchase history, defaulting to the womens creative when a customer has bought
-    both (the CATE work in reports/07_uplift_policy.md shows that segment responds slightly better
-    to the pooled treatment than mens-only customers do)."""
-    womens_first = np.where(df["womens"] == 1, "Womens E-Mail", "")
-    mens_fallback = np.where(df["mens"] == 1, "Mens E-Mail", CONTROL_ARM)
-    return np.where(womens_first != "", womens_first, mens_fallback)
+    """Match exclusive history and use the stronger overall mens creative for dual buyers."""
+    mens = df["mens"].to_numpy() == 1
+    womens = df["womens"].to_numpy() == 1
+    return np.select(
+        [mens, womens],
+        ["Mens E-Mail", "Womens E-Mail"],
+        default=CONTROL_ARM,
+    )
+
+
+def incremental_net_value(
+    policy_spend: float,
+    no_email_spend: float,
+    contact_rate: float,
+    gross_margin: float,
+    email_cost: float,
+) -> float:
+    """Return incremental contribution per customer under an explicit margin assumption."""
+    if not 0 <= contact_rate <= 1:
+        raise ValueError("contact_rate must be between 0 and 1")
+    if not 0 <= gross_margin <= 1:
+        raise ValueError("gross_margin must be between 0 and 1")
+    if email_cost < 0:
+        raise ValueError("email_cost must be non-negative")
+    return (policy_spend - no_email_spend) * gross_margin - contact_rate * email_cost
+
+
+def break_even_margin(
+    policy_spend: float,
+    no_email_spend: float,
+    contact_rate: float,
+    email_cost: float,
+) -> float | None:
+    """Return the gross margin at which incremental contribution reaches zero."""
+    if not 0 <= contact_rate <= 1:
+        raise ValueError("contact_rate must be between 0 and 1")
+    if email_cost < 0:
+        raise ValueError("email_cost must be non-negative")
+    delta_spend = policy_spend - no_email_spend
+    if delta_spend == 0:
+        return 0.0 if contact_rate == 0 else None
+    if delta_spend < 0:
+        return None
+    return contact_rate * email_cost / delta_spend
 
 
 def ipw_policy_value(

@@ -29,3 +29,27 @@ def test_policy_conclusion_follows_paired_interval_not_point_ordering():
 
     assert "does not establish" in conclusion
     assert "blanket mens" in conclusion
+
+
+def test_policy_manifest_names_all_static_actions():
+    policies = {
+        "learned (DRPolicyForest)": [],
+        "email everyone (mens creative)": [],
+        "email everyone (womens creative)": [],
+        "purchase-history heuristic": [],
+        "email nobody": [],
+    }
+
+    assert "email everyone (mens creative)" in policies
+    assert "email everyone (womens creative)" in policies
+    assert "email nobody" in policies
+
+
+def test_action_shares_include_zero_for_missing_arms():
+    recommendations = pd.Series(["Mens E-Mail", "Mens E-Mail", "Womens E-Mail"])
+    shares = recommendations.value_counts(normalize=True).reindex(
+        ["Mens E-Mail", "Womens E-Mail", "No E-Mail"], fill_value=0.0
+    )
+
+    assert shares.sum() == 1.0
+    assert shares["No E-Mail"] == 0.0

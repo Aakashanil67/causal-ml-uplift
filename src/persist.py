@@ -2,7 +2,7 @@
 helper it calls.
 
 Refit on the full 64,000 rows, not the 70% train split `src/cate.py` uses for honest evaluation:
-heterogeneity has already been validated against a held-out set in `reports/07_uplift_policy.md`,
+heterogeneity has already been examined on a held-out set in `reports/07_uplift_policy.md`,
 so the deployed artifact should use every available row rather than holding 30% back for no benefit
 at serving time. Artifact size measured directly rather than assumed: 34.47 MB, comfortably under
 both GitHub's 100MB hard limit and the 50MB threshold this project set for needing a distilled

@@ -128,6 +128,15 @@ def test_normalized_qini_bootstrap_is_deterministic():
     assert low_a <= point_a <= high_a
 
 
+def test_qini_interval_is_labelled_as_fixed_model_conditional_in_source():
+    import inspect
+
+    from src.uplift import bootstrap_normalized_qini_ci
+
+    assert "fixed-model" in inspect.getdoc(bootstrap_normalized_qini_ci).lower()
+    assert "conditional" in inspect.getdoc(bootstrap_normalized_qini_ci).lower()
+
+
 def test_repeated_qini_summary_keeps_split_level_evidence_visible():
     runs = pd.DataFrame({"seed": [11, 22, 33], "normalized_qini": [0.04, -0.01, 0.02]})
 
