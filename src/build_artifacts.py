@@ -41,6 +41,12 @@ from src.uplift import (
 )
 
 REPEAT_SEEDS = (RANDOM_SEED, 7, 19, 73, 101)
+FOREST_SENSITIVITY = (
+    {"label": "smaller leaves", "min_samples_leaf": 25, "max_depth": None},
+    {"label": "primary", "min_samples_leaf": 50, "max_depth": None},
+    {"label": "larger leaves", "min_samples_leaf": 100, "max_depth": None},
+    {"label": "depth capped", "min_samples_leaf": 50, "max_depth": 5},
+)
 
 
 def _native(value):
@@ -96,10 +102,16 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
         cate = predict_cate(forest, eval_df)
         treatment = eval_df[TREATMENT_COL].to_numpy()
         outcome = eval_df["visit"].to_numpy(dtype=float)
+        repeated_qini = bootstrap_normalized_qini_ci(
+            cate, treatment, outcome, n_boot=300, seed=seed
+        )
         repeated_rows.append(
             {
                 "seed": seed,
                 "normalized_qini": normalized_qini_score(cate, treatment, outcome),
+                "qini_ci_low": repeated_qini[1],
+                "qini_ci_high": repeated_qini[2],
+                "n_eval": int(len(eval_df)),
             }
         )
         if seed == RANDOM_SEED:
@@ -123,6 +135,25 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
     spend_low, spend_high = bootstrap_uplift_per_email_ci(
         cate, treatment, spend, 0.3, n_boot=n_boot, seed=1
     )
+
+    forest_sensitivity = []
+    for config in FOREST_SENSITIVITY:
+        sensitivity_forest = fit_causal_forest(
+            train,
+            seed=RANDOM_SEED,
+            n_estimators=500,
+            min_samples_leaf=config["min_samples_leaf"],
+            max_depth=config["max_depth"],
+        )
+        sensitivity_cate = predict_cate(sensitivity_forest, eval_df)
+        forest_sensitivity.append(
+            {
+                "label": config["label"],
+                "min_samples_leaf": config["min_samples_leaf"],
+                "max_depth": config["max_depth"],
+                "normalized_qini": normalized_qini_score(sensitivity_cate, treatment, visit),
+            }
+        )
 
     policy_forest = fit_policy_forest(train)
     learned = policy_forest_recommendations(policy_forest, eval_df)
@@ -151,6 +182,40 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
         n_boot=max(200, n_boot // 5),
         seed=3,
     )
+
+    policy_split_sensitivity = []
+    for seed in repeat_seeds:
+        split_train, split_eval = split_train_eval(df, seed=seed)
+        split_policy_forest = fit_policy_forest(split_train, seed=seed)
+        split_learned = policy_forest_recommendations(split_policy_forest, split_eval)
+        split_predictions = crossfit_arm_outcomes(split_eval, seed=seed)
+        split_policies = {
+            "learned (DRPolicyForest)": split_learned,
+            "email everyone (mens creative)": np.full(len(split_eval), "Mens E-Mail"),
+        }
+        split_values, split_comparisons = evaluate_policies(
+            split_eval,
+            split_policies,
+            split_predictions,
+            propensities=NOMINAL_PROPENSITIES,
+            n_boot=1,
+            seed=seed,
+        )
+        comparison = split_comparisons.loc[
+            "learned (DRPolicyForest) - email everyone (mens creative)"
+        ]
+        shares = pd.Series(split_learned).value_counts(normalize=True).reindex(ARMS, fill_value=0.0)
+        policy_split_sensitivity.append(
+            {
+                "seed": seed,
+                "learned_value": float(split_values.loc["learned (DRPolicyForest)", "value"]),
+                "blanket_mens_value": float(
+                    split_values.loc["email everyone (mens creative)", "value"]
+                ),
+                "learned_minus_blanket_mens": float(comparison["difference"]),
+                "recommendation_shares": {arm: float(shares[arm]) for arm in ARMS},
+            }
+        )
     spend_predictions = crossfit_arm_outcomes(eval_df, outcome_col="spend")
     spend_values, spend_comparisons = evaluate_policies(
         eval_df,
@@ -210,6 +275,10 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
             },
             "repeated_splits": records_for_json(repeated.set_index("seed")),
             "repeated_summary": summarize_repeated_qini(repeated),
+            "repeated_split_note": (
+                "repeated sample splits are sensitivity evidence, not independent replications"
+            ),
+            "forest_sensitivity": forest_sensitivity,
             "deciles": records_for_json(deciles),
             "top_k": records_for_json(top_k),
             "gross_spend_top_30": {
@@ -236,6 +305,7 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
                 for arm in ARMS
             },
             "conclusion": policy_conclusion(comparisons),
+            "split_sensitivity": policy_split_sensitivity,
         },
         "reported_spend_sensitivity": {
             "analysis": "evaluation of a visit-optimised policy; reported spend is not profit",
