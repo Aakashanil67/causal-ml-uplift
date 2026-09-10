@@ -18,7 +18,15 @@ from src.config import (
 )
 
 RESULTS_SCHEMA_VERSION = 2
-REQUIRED_SECTIONS = {"metadata", "headline", "interactions", "ranking", "policy"}
+REQUIRED_SECTIONS = {
+    "metadata",
+    "headline",
+    "interactions",
+    "ranking",
+    "policy",
+    "reported_spend_sensitivity",
+    "simulation",
+}
 PROVENANCE_PACKAGES = ("econml", "lightgbm", "numpy", "pandas", "scikit-learn")
 
 

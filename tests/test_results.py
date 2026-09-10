@@ -35,6 +35,8 @@ def valid_results():
         },
         "ranking": {"normalized_qini": 0.02, "repeated_splits": []},
         "policy": {"values": [], "comparisons": []},
+        "reported_spend_sensitivity": {"values": []},
+        "simulation": {"rows": []},
     }
 
 

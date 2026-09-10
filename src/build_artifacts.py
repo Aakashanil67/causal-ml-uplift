@@ -29,6 +29,7 @@ from src.policy import (
     policy_forest_recommendations,
 )
 from src.results import build_provenance, save_evaluation_artifacts, save_results
+from src.simulation import run_monte_carlo
 from src.uplift import (
     bootstrap_normalized_qini_ci,
     bootstrap_uplift_per_email_ci,
@@ -317,6 +318,10 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
                 learned_spend, no_email_spend, contact_rate, 0.10
             ),
             "margin_sensitivity": margin_sensitivity,
+        },
+        "simulation": {
+            "analysis": "semi-synthetic Monte Carlo stress test with known data-generating effects",
+            "rows": records_for_json(run_monte_carlo()),
         },
     }
     serving_payload = {
