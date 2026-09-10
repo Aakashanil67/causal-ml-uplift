@@ -20,10 +20,10 @@ def test_treatment_name_to_arm_maps_none_to_control():
     assert _treatment_name_to_arm("T0_Womens E-Mail") == "Womens E-Mail"
 
 
-def test_heuristic_prioritises_womens_when_both_purchased():
+def test_heuristic_uses_mens_for_dual_category_customers():
     df = pd.DataFrame({"mens": [1, 0, 1, 0], "womens": [0, 1, 1, 0]})
     rec = heuristic_recommendations(df)
-    assert rec.tolist() == ["Mens E-Mail", "Womens E-Mail", "Womens E-Mail", "No E-Mail"]
+    assert rec.tolist() == ["Mens E-Mail", "Womens E-Mail", "Mens E-Mail", "No E-Mail"]
 
 
 def test_ipw_policy_value_recovers_arm_mean_when_recommending_that_arm_for_everyone():

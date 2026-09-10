@@ -46,13 +46,14 @@ def policy_forest_recommendations(pf: DRPolicyForest, df: pd.DataFrame) -> np.nd
 
 
 def heuristic_recommendations(df: pd.DataFrame) -> np.ndarray:
-    """The obvious rule a marketer would try without any modelling: match the creative to the
-    customer's own purchase history, defaulting to the womens creative when a customer has bought
-    both (the CATE work in reports/07_uplift_policy.md shows that segment responds slightly better
-    to the pooled treatment than mens-only customers do)."""
-    womens_first = np.where(df["womens"] == 1, "Womens E-Mail", "")
-    mens_fallback = np.where(df["mens"] == 1, "Mens E-Mail", CONTROL_ARM)
-    return np.where(womens_first != "", womens_first, mens_fallback)
+    """Match exclusive history and use the stronger overall mens creative for dual buyers."""
+    mens = df["mens"].to_numpy() == 1
+    womens = df["womens"].to_numpy() == 1
+    return np.select(
+        [mens, womens],
+        ["Mens E-Mail", "Womens E-Mail"],
+        default=CONTROL_ARM,
+    )
 
 
 def ipw_policy_value(

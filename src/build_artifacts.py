@@ -11,6 +11,7 @@ from src.cate import (
 )
 from src.config import (
     ARM_COL,
+    ARMS,
     CONTROL_ARM,
     NOMINAL_PROPENSITIES,
     RANDOM_SEED,
@@ -122,6 +123,7 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
     policies = {
         "learned (DRPolicyForest)": learned,
         "email everyone (mens creative)": np.full(len(eval_df), "Mens E-Mail"),
+        "email everyone (womens creative)": np.full(len(eval_df), "Womens E-Mail"),
         "purchase-history heuristic": heuristic_recommendations(eval_df),
         "email nobody": np.full(len(eval_df), CONTROL_ARM),
     }
@@ -191,6 +193,14 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
             "empirical_propensities": empirical_propensities,
             "recommendation_counts": {
                 arm: int(count) for arm, count in pd.Series(learned).value_counts().items()
+            },
+            "recommendation_shares": {
+                arm: float(
+                    pd.Series(learned)
+                    .value_counts(normalize=True)
+                    .reindex(ARMS, fill_value=0.0)[arm]
+                )
+                for arm in ARMS
             },
             "conclusion": policy_conclusion(comparisons),
         },
