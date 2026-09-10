@@ -2,23 +2,30 @@
 
 ## Interaction check
 
-The segmentation claim is checked with one pre-specified HC1-robust OLS containing the
-four treatment interactions below. Holm-adjusted p-values control the family-wise error
-rate; the joint Wald p-value is 1.01e-10.
+This post-hoc held-out interaction audit uses HC1-robust OLS with mens-only as the
+observed reference segment. Direct segment effects are evaluated at mean recency and
+history; the joint Wald p-value is 8.55e-07.
 
-| interaction | estimate | 95% CI | raw p | Holm-adjusted p |
-|---|---:|---:|---:|---:|
-| treatment × `mens` | +0.03333 | [+0.00949, +0.05717] | 0.006146 | 0.01844 |
-| treatment × `womens` | +0.06593 | [+0.04208, +0.08978] | 6.038e-08 | 2.415e-07 |
-| treatment × `recency` | -0.00013 | [-0.00173, +0.00147] | 0.8771 | 1 |
-| treatment × `history` | -0.00000 | [-0.00003, +0.00002] | 0.7143 | 1 |
+| segment | effect on visit | 95% CI |
+|---|---:|---:|
+| mens only | +0.04025 | [+0.02611, +0.05439] |
+| womens only | +0.06170 | [+0.04705, +0.07635] |
+| both | +0.15822 | [+0.11976, +0.19668] |
 
-Purchase-history interactions survive adjustment; recency and history do not. This is
-the executable check behind the forest interpretation, not a p-value copied into prose.
+The effect-modification contrasts are reported below with Holm-adjusted p-values across
+the four reported contrasts. This is a post-hoc exploratory audit defined after the primary analysis.
+
+| contrast | estimate | 95% CI | Holm-adjusted p |
+|---|---:|---:|---:|
+| womens only - mens only | +0.02145 | [+0.00123, +0.04167] | 0.1128 |
+| both - mens only | +0.11797 | [+0.07636, +0.15957] | 1.094e-07 |
+| recency | -0.00045 | [-0.00335, +0.00246] | 1 |
+| history | -0.00001 | [-0.00006, +0.00003] | 1 |
+
 
 ## Ranking evidence
 
-Raw Qini area is 17.84. The comparable normalized score is 0.0111 [-0.0114, 0.0331]. Across five honest splits the score averages 0.0211, with a range from 0.0111 to 0.0360. The primary bootstrap interval includes zero. The CATE surface may contain real segment-level structure while still failing to rank individual customers reliably enough for deployment.
+Raw Qini area is 17.84. The comparable normalized score is 0.0111 [-0.0114, 0.0331]. Across five honest splits the score averages 0.0211, with a range from 0.0111 to 0.0360. The primary fixed-model conditional bootstrap interval includes zero. The CATE surface may contain real segment-level structure while still failing to rank individual customers reliably enough for deployment.
 
 | decile (0 = highest predicted uplift) | predicted CATE | observed uplift | n |
 |---|---:|---:|---:|
@@ -52,19 +59,32 @@ At 30%, reported gross spend is $0.7816 [$0.3733, $1.2743] per targeted customer
 ## Three-action policy
 
 Values use cross-fitted outcome models, nominal one-third randomisation probabilities and
-doubly robust scores. Bootstrap samples preserve the arm counts.
+doubly robust scores. Bootstrap samples preserve the arm counts; intervals are fixed-model
+conditional evaluation intervals.
 
 | policy | visit-rate value | 95% CI |
 |---|---:|---:|
 | learned (DRPolicyForest) | 0.1823 | [0.1730, 0.1916] |
 | email everyone (mens creative) | 0.1810 | [0.1719, 0.1902] |
-| purchase-history heuristic | 0.1803 | [0.1706, 0.1900] |
+| email everyone (womens creative) | 0.1520 | [0.1433, 0.1615] |
+| purchase-history heuristic | 0.1848 | [0.1751, 0.1940] |
 | email nobody | 0.1070 | [0.0994, 0.1151] |
+
+The learned policy was trained to maximise visits, not spend or profit. Reported-spend
+sensitivity is shown separately because margin and email cost are not identified by this
+experiment.
+
+| gross margin assumption | incremental net value vs email nobody |
+|---:|---:|
+| 25% | $+0.0815 |
+| 50% | $+0.2631 |
+| 100% | $+0.6261 |
 
 | paired comparison | difference | 95% CI |
 |---|---:|---:|
 | learned (DRPolicyForest) - email everyone (mens creative) | +0.0013 | [-0.0014, +0.0040] |
-| learned (DRPolicyForest) - purchase-history heuristic | +0.0019 | [-0.0079, +0.0111] |
+| learned (DRPolicyForest) - email everyone (womens creative) | +0.0303 | [+0.0176, +0.0427] |
+| learned (DRPolicyForest) - purchase-history heuristic | -0.0025 | [-0.0102, +0.0053] |
 | learned (DRPolicyForest) - email nobody | +0.0753 | [+0.0634, +0.0877] |
 
 Held-out evidence does not establish that the learned policy beats blanket mens emailing. Blanket mens is the simpler evidence-supported action; personalised policy deployment needs a new experiment or stronger cross-campaign evidence.

@@ -45,9 +45,9 @@ CATEGORICAL_LEVELS = {
     "channel": ["Multichannel", "Phone", "Web"],
 }
 
-# heterogeneity is only well-powered on visit (~9,000 events across 64,000 rows) — conversion and
-# spend have 578 non-zero outcomes total, so CATE work targets visit specifically; see
-# reports/data_dictionary.md for the power check this constant is based on.
+# heterogeneity work targets visit (~9,000 events across 64,000 rows) — conversion and spend have
+# 578 non-zero outcomes total, so CATE work is exploratory and targets visit specifically; see
+# reports/data_dictionary.md for the event-density rationale.
 CATE_OUTCOME = "visit"
 
 # 70/30, stratified on arm and CATE_OUTCOME — every CATE/Qini number reported comes from the 30%
@@ -56,6 +56,6 @@ TRAIN_FRACTION = 0.7
 EVAL_FRACTION = 0.3
 
 # per-contact email cost: a stated assumption, not a fitted value, because Hillstrom ships no cost
-# data. Configurable per call. reports/07_uplift_policy.md also reports the break-even cost at
-# which top-k targeting stops paying, which is derived from the data rather than assumed.
+# data. Configurable per call. The generated report includes reported-spend sensitivity at explicit
+# gross-margin scenarios; it does not present spend as profit.
 DEFAULT_EMAIL_COST_USD = 0.10

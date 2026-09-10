@@ -70,6 +70,7 @@ def render_readme_results(results: dict) -> str:
     for name in (
         "learned (DRPolicyForest)",
         "email everyone (mens creative)",
+        "email everyone (womens creative)",
         "purchase-history heuristic",
         "email nobody",
     ):
@@ -89,17 +90,15 @@ def render_readme_results(results: dict) -> str:
 
 def render_readme_run() -> str:
     return """```powershell
-python -m venv .venv
-.venv\\Scripts\\Activate.ps1
-pip install -r requirements.txt
-python -m src.pipeline
-streamlit run app/simulator.py
+py -3.12 -m venv .venv
+.venv\\Scripts\\python.exe -m pip install -r requirements.txt
+.venv\\Scripts\\python.exe -m src.pipeline
+.venv\\Scripts\\python.exe -m streamlit run app/simulator.py
 ```
 
-On macOS or Linux, activate with `source .venv/bin/activate`. The pipeline regenerates the
-manifest, serving artifacts, Markdown reports, figures, production model and PDF in dependency
-order. Run `pytest -v` for tests and `ruff check . && ruff format --check .` for the code-quality
-gate."""
+On macOS or Linux, use `.venv/bin/python` in place of the Windows path. The pipeline regenerates
+the manifest, serving artifacts, Markdown reports, figures, production model and PDF in dependency
+order. `scripts/verify.ps1` runs the pinned-environment quality gate."""
 
 
 def render_readme_status(results: dict) -> str:
@@ -120,7 +119,8 @@ or telecoms campaign."""
 
 
 def render_uplift_report(results: dict) -> str:
-    interaction_rows = results["interactions"]["terms"]
+    interaction_rows = results["interactions"]["segment_effects"]
+    contrast_rows = results["interactions"]["contrasts"]
     ranking = results["ranking"]
     qini = ranking["normalized_qini"]
     repeat = ranking["repeated_summary"]
@@ -131,31 +131,41 @@ def render_uplift_report(results: dict) -> str:
         "",
         "## Interaction check",
         "",
-        "The segmentation claim is checked with one pre-specified HC1-robust OLS containing the",
-        "four treatment interactions below. Holm-adjusted p-values control the family-wise error",
-        f"rate; the joint Wald p-value is {results['interactions']['joint_p_value']:.3g}.",
+        "This post-hoc held-out interaction audit uses HC1-robust OLS with mens-only as the",
+        "observed reference segment. Direct segment effects are evaluated at mean recency and",
+        f"history; the joint Wald p-value is {results['interactions']['joint_p_value']:.3g}.",
         "",
-        "| interaction | estimate | 95% CI | raw p | Holm-adjusted p |",
-        "|---|---:|---:|---:|---:|",
+        "| segment | effect on visit | 95% CI |",
+        "|---|---:|---:|",
     ]
     for row in interaction_rows:
-        term = row.get("term", row.get("index"))
         lines.append(
-            f"| treatment × `{term}` | {row['estimate']:+.5f} | "
-            f"[{row['ci_low']:+.5f}, {row['ci_high']:+.5f}] | "
-            f"{row['p_value']:.4g} | {row['p_holm']:.4g} |"
+            f"| {row['segment']} | {row['estimate']:+.5f} | "
+            f"[{row['ci_low']:+.5f}, {row['ci_high']:+.5f}] |"
         )
     lines += [
         "",
-        "Purchase-history interactions survive adjustment; recency and history do not. This is",
-        "the executable check behind the forest interpretation, not a p-value copied into prose.",
+        "The effect-modification contrasts are reported below with Holm-adjusted p-values across",
+        "the four reported contrasts. This is a post-hoc exploratory audit defined after the primary analysis.",
+        "",
+        "| contrast | estimate | 95% CI | Holm-adjusted p |",
+        "|---|---:|---:|---:|",
+    ]
+    for row in contrast_rows:
+        lines.append(
+            f"| {row['contrast']} | {row['estimate']:+.5f} | "
+            f"[{row['ci_low']:+.5f}, {row['ci_high']:+.5f}] | {row['p_holm']:.4g} |"
+        )
+    lines += [
+        "",
         "",
         "## Ranking evidence",
         "",
         f"Raw Qini area is {ranking['raw_qini']:.2f}. The comparable normalized score is "
         f"{qini['value']:.4f} [{qini['ci_low']:.4f}, {qini['ci_high']:.4f}]. Across five honest "
         f"splits the score averages {repeat['mean']:.4f}, with a range from {repeat['min']:.4f} "
-        f"to {repeat['max']:.4f}. The primary bootstrap interval includes zero. The CATE surface "
+        f"to {repeat['max']:.4f}. The primary fixed-model conditional bootstrap interval includes "
+        "zero. The CATE surface "
         "may contain real segment-level structure while still failing to rank individual customers "
         "reliably enough for deployment.",
         "",
@@ -194,7 +204,8 @@ def render_uplift_report(results: dict) -> str:
         "## Three-action policy",
         "",
         "Values use cross-fitted outcome models, nominal one-third randomisation probabilities and",
-        "doubly robust scores. Bootstrap samples preserve the arm counts.",
+        "doubly robust scores. Bootstrap samples preserve the arm counts; intervals are fixed-model",
+        "conditional evaluation intervals.",
         "",
         "| policy | visit-rate value | 95% CI |",
         "|---|---:|---:|",
@@ -204,6 +215,18 @@ def render_uplift_report(results: dict) -> str:
             f"| {row['policy']} | {row['value']:.4f} | "
             f"[{row['ci_low']:.4f}, {row['ci_high']:.4f}] |"
         )
+    spend = results["reported_spend_sensitivity"]
+    lines += [
+        "",
+        "The learned policy was trained to maximise visits, not spend or profit. Reported-spend",
+        "sensitivity is shown separately because margin and email cost are not identified by this",
+        "experiment.",
+        "",
+        "| gross margin assumption | incremental net value vs email nobody |",
+        "|---:|---:|",
+    ]
+    for row in spend["margin_sensitivity"]:
+        lines.append(f"| {row['gross_margin']:.0%} | ${row['incremental_net_value']:+.4f} |")
     lines += [
         "",
         "| paired comparison | difference | 95% CI |",
@@ -257,9 +280,10 @@ def render_interview_answers(results: dict) -> dict[int, str]:
             "Raw Qini is the area between cumulative incremental gain under the model ranking and "
             "random targeting; here it is 17.84, which depends on sample size. The normalized score "
             f"is {qini['value']:.4f} [{qini['ci_low']:.4f}, {qini['ci_high']:.4f}]. Five honest "
-            f"splits range from {repeated['min']:.4f} to {repeated['max']:.4f}. The primary interval "
-            "includes zero, so a positive raw area is not enough to claim a deployment-quality "
-            "ranking."
+            f"sample splits range from {repeated['min']:.4f} to {repeated['max']:.4f}; these are "
+            "sensitivity evidence, not independent replications. The primary interval is "
+            "conditional on the fitted ranking and includes zero, so a positive raw area is not "
+            "enough to claim a deployment-quality ranking."
         ),
         15: (
             "I would run a new campaign designed around action-level trade-offs. Both creatives "
@@ -292,7 +316,8 @@ def render_causal_intro(results: dict) -> str:
 
 
 def _causal_sections(results: dict) -> dict[str, str]:
-    interaction = _table_by(results["interactions"]["terms"], "term")
+    segment_effects = _table_by(results["interactions"]["segment_effects"], "segment")
+    contrasts = _table_by(results["interactions"]["contrasts"], "contrast")
     ranking = results["ranking"]
     qini = ranking["normalized_qini"]
     values = _table_by(results["policy"]["values"], "policy")
@@ -301,21 +326,21 @@ def _causal_sections(results: dict) -> dict[str, str]:
     return {
         "## 5. Heterogeneity: who the email actually helps": (
             "The causal forest estimates profile-level conditional average effects on `visit`. "
-            "I did not treat its segments as evidence on their own. A pre-specified HC1-robust "
-            "interaction regression gives treatment × `mens` "
-            f"{interaction['mens']['estimate']:+.4f} (Holm p={interaction['mens']['p_holm']:.4f}) "
-            "and treatment × `womens` "
-            f"{interaction['womens']['estimate']:+.4f} "
-            f"(Holm p={interaction['womens']['p_holm']:.3g}). Recency and history both have "
-            "adjusted p-values of 1.000. The joint Wald p-value is "
-            f"{results['interactions']['joint_p_value']:.3g}. Purchase history therefore supports "
-            "a segment-level interpretation; recency and prior spend do not."
+            "I did not treat its segments as evidence on their own. A post-hoc held-out HC1-robust "
+            f"audit estimates {segment_effects['mens only']['estimate']:+.4f} for mens-only, "
+            f"{segment_effects['womens only']['estimate']:+.4f} for womens-only and "
+            f"{segment_effects['both']['estimate']:+.4f} for both-category customers. The "
+            f"womens-only minus mens-only contrast has Holm p={contrasts['womens only - mens only']['p_holm']:.3g}; "
+            f"the joint Wald p-value is {results['interactions']['joint_p_value']:.3g}. This is "
+            "exploratory evidence of segment differences, not a person-level causal effect."
         ),
         "## 6. Uplift ranking and targeting economics": (
             f"The primary split's normalized Qini is {qini['value']:.4f} "
-            f"[{qini['ci_low']:.4f}, {qini['ci_high']:.4f}]. Five honest splits are all positive, "
-            f"but range from {ranking['repeated_summary']['min']:.4f} to "
-            f"{ranking['repeated_summary']['max']:.4f}; the primary bootstrap interval still "
+            f"[{qini['ci_low']:.4f}, {qini['ci_high']:.4f}]. Five repeated sample splits are all "
+            "positive in this run, but range from "
+            f"{ranking['repeated_summary']['min']:.4f} to "
+            f"{ranking['repeated_summary']['max']:.4f}; the primary fixed-model conditional "
+            "bootstrap interval still "
             "includes zero. That is weak ranking evidence. The top-30% pooled-mixture diagnostic "
             f"estimates {ranking['top_k'][2]['value']:+.4f} visits per emailed customer, but it "
             "does not tell a marketer which creative to send. The three-action analysis answers "
@@ -351,7 +376,7 @@ def _rendered_outputs(results: dict) -> dict[Path, str]:
     report = CAUSAL_REPORT_PATH.read_text(encoding="utf-8")
     report = replace_markdown_section(
         report,
-        "## Estimating who a marketing email persuades, on a randomised experiment, with constructed stress tests and refutation checks",
+        "## Can causal ML find deployable treatment-effect heterogeneity, or only a reliable average effect?",
         render_causal_intro(results),
     )
     for heading, body in _causal_sections(results).items():
@@ -364,9 +389,8 @@ def _rendered_outputs(results: dict) -> dict[Path, str]:
         )
     else:
         report = report.replace("\n---\n", f"\n\n{_references()}\n\n---\n")
-    report = report.replace(
-        "`reports/01` through `reports/08`", "`reports/01` through `reports/09`"
-    )
+    old_inventory = "`reports/01` through `reports/" + "09`"
+    report = report.replace(old_inventory, "`reports/01` through `reports/08`")
 
     interview = INTERVIEW_PATH.read_text(encoding="utf-8")
     for number, answer in render_interview_answers(results).items():

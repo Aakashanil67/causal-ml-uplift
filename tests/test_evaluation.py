@@ -18,6 +18,19 @@ def test_crossfit_arm_outcomes_returns_aligned_probabilities():
     assert predictions.le(1).all().all()
 
 
+def test_crossfit_arm_outcomes_supports_continuous_spend():
+    from src.data_loader import load_hillstrom
+
+    df = load_hillstrom().groupby(ARM_COL, group_keys=False).head(1200).reset_index(drop=True)
+    predictions = crossfit_arm_outcomes(
+        df, outcome_col="spend", n_splits=3, seed=19, n_estimators=10
+    )
+
+    assert predictions.index.equals(df.index)
+    assert predictions.columns.tolist() == ARMS
+    assert np.isfinite(predictions.to_numpy()).all()
+
+
 def test_evaluate_policies_reports_marginal_and_paired_intervals():
     df = pd.DataFrame(
         {

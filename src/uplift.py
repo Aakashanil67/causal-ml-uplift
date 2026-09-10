@@ -1,6 +1,7 @@
-"""Uplift ranking, Qini evaluation, and targeting economics — all computed by hand rather than via
-`scikit-uplift`, so every number here can be defended line by line. `scikit-uplift` is still
-installed and used as an independent cross-check in one test.
+"""Uplift ranking, Qini evaluation, and targeting economics.
+
+The cumulative gain curve and raw Qini area are implemented locally. Normalized Qini uses
+`scikit-uplift` as the reference implementation and is covered by fixed-fixture tests.
 
 Everything below runs on the held-out eval set from `src/cate.py`, ranked by predicted CATE. The
 Qini gain at a targeting fraction k is the standard Radcliffe & Surry (2011) definition: the sum of
@@ -68,7 +69,7 @@ def bootstrap_normalized_qini_ci(
     n_boot: int = 1000,
     seed: int = 0,
 ) -> tuple[float, float, float]:
-    """Arm-stratified bootstrap interval for a fixed model's normalized Qini score."""
+    """Fixed-model conditional interval for normalized Qini via arm-stratified bootstrap."""
     scores = np.asarray(cate_scores)
     T = np.asarray(treatment)
     Y = np.asarray(outcome)
@@ -179,7 +180,7 @@ def bootstrap_uplift_per_email_ci(
     n_boot: int = 1000,
     seed: int = 0,
 ) -> tuple[float, float]:
-    """Bootstrap a top-k pooled-email effect while holding each row's score fixed."""
+    """Fixed-ranking conditional interval for a top-k pooled-email effect."""
     rng = np.random.default_rng(seed)
     n = len(cate_scores)
     estimates = np.empty(n_boot)

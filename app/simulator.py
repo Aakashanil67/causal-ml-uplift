@@ -16,6 +16,7 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import streamlit as st
 
 from src.config import (
@@ -24,6 +25,7 @@ from src.config import (
     TREATMENT_COL,
 )
 from src.persist import load_model, predict_cate_for_profile
+from src.policy import incremental_net_value
 from src.results import load_evaluation_artifacts, load_results
 from src.uplift import qini_curve, uplift_per_email_at_k
 
@@ -203,12 +205,41 @@ def render_policy_tab():
     )
     st.dataframe(values[["value", "95% CI"]], width="stretch")
 
+    shares = pd.Series(results["policy"]["recommendation_shares"], name="share")
+    st.caption("Learned-policy action shares on the held-out evaluation set")
+    st.dataframe(shares.to_frame().style.format("{:.1%}"), width="stretch")
+
     comparisons = artifact["policy_comparisons"].copy()
     comparisons["95% CI"] = comparisons.apply(
         lambda row: f"[{row['ci_low']:+.4f}, {row['ci_high']:+.4f}]", axis=1
     )
     st.dataframe(comparisons[["difference", "95% CI"]], width="stretch")
     st.info(results["policy"]["conclusion"])
+
+    st.divider()
+    st.subheader("Reported-spend sensitivity")
+    st.warning(
+        "Spend is reported and capped in the source data. The learned policy was trained to "
+        "maximise visits, not profit; this calculation is a margin sensitivity, not a profit "
+        "estimate."
+    )
+    margin = st.slider("Assumed gross margin", 0, 100, 30) / 100
+    email_cost = st.number_input(
+        "Cost per email", min_value=0.0, value=DEFAULT_EMAIL_COST_USD, step=0.01
+    )
+    spend_values = results["reported_spend_sensitivity"]["values"]
+    spend_by_policy = {row["policy"]: row["value"] for row in spend_values}
+    learned_spend = spend_by_policy["learned (DRPolicyForest)"]
+    no_email_spend = spend_by_policy["email nobody"]
+    contact_rate = results["reported_spend_sensitivity"]["contact_rate"]
+    contribution = incremental_net_value(
+        learned_spend, no_email_spend, contact_rate, margin, email_cost
+    )
+    st.metric("Estimated incremental contribution per customer", f"${contribution:+.4f}")
+    st.caption(
+        f"Uses stored reported-spend values of ${learned_spend:.4f} for the learned policy and "
+        f"${no_email_spend:.4f} for email nobody, with a {contact_rate:.1%} learned contact rate."
+    )
 
 
 def main():

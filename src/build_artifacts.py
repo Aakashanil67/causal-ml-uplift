@@ -11,6 +11,7 @@ from src.cate import (
 )
 from src.config import (
     ARM_COL,
+    ARMS,
     CONTROL_ARM,
     NOMINAL_PROPENSITIES,
     RANDOM_SEED,
@@ -20,8 +21,15 @@ from src.dml_ate import per_arm_ate_table, pooled_ate_table
 from src.evaluation import crossfit_arm_outcomes, evaluate_policies
 from src.interactions import interaction_test
 from src.persist import fit_and_save
-from src.policy import fit_policy_forest, heuristic_recommendations, policy_forest_recommendations
+from src.policy import (
+    break_even_margin,
+    fit_policy_forest,
+    heuristic_recommendations,
+    incremental_net_value,
+    policy_forest_recommendations,
+)
 from src.results import build_provenance, save_evaluation_artifacts, save_results
+from src.simulation import run_monte_carlo
 from src.uplift import (
     bootstrap_normalized_qini_ci,
     bootstrap_uplift_per_email_ci,
@@ -34,6 +42,12 @@ from src.uplift import (
 )
 
 REPEAT_SEEDS = (RANDOM_SEED, 7, 19, 73, 101)
+FOREST_SENSITIVITY = (
+    {"label": "smaller leaves", "min_samples_leaf": 25, "max_depth": None},
+    {"label": "primary", "min_samples_leaf": 50, "max_depth": None},
+    {"label": "larger leaves", "min_samples_leaf": 100, "max_depth": None},
+    {"label": "depth capped", "min_samples_leaf": 50, "max_depth": 5},
+)
 
 
 def _native(value):
@@ -81,8 +95,6 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
     df = load_hillstrom()
     pooled = pooled_ate_table(df)
     per_arm = per_arm_ate_table(df)
-    interactions, joint_p = interaction_test(df)
-
     repeated_rows = []
     primary = None
     for seed in repeat_seeds:
@@ -91,10 +103,16 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
         cate = predict_cate(forest, eval_df)
         treatment = eval_df[TREATMENT_COL].to_numpy()
         outcome = eval_df["visit"].to_numpy(dtype=float)
+        repeated_qini = bootstrap_normalized_qini_ci(
+            cate, treatment, outcome, n_boot=300, seed=seed
+        )
         repeated_rows.append(
             {
                 "seed": seed,
                 "normalized_qini": normalized_qini_score(cate, treatment, outcome),
+                "qini_ci_low": repeated_qini[1],
+                "qini_ci_high": repeated_qini[2],
+                "n_eval": int(len(eval_df)),
             }
         )
         if seed == RANDOM_SEED:
@@ -103,6 +121,15 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
         raise ValueError(f"repeat_seeds must include the primary seed {RANDOM_SEED}.")
 
     train, eval_df, cate = primary
+    segment_effects, contrasts, joint_p = interaction_test(eval_df)
+
+    def pooled_visit_difference(frame: pd.DataFrame) -> float:
+        return float(
+            frame.loc[frame[TREATMENT_COL] == 1, "visit"].mean()
+            - frame.loc[frame[TREATMENT_COL] == 0, "visit"].mean()
+        )
+
+    deduplicated = df.drop_duplicates().reset_index(drop=True)
     treatment = eval_df[TREATMENT_COL].to_numpy()
     visit = eval_df["visit"].to_numpy(dtype=float)
     spend = eval_df["spend"].to_numpy(dtype=float)
@@ -118,11 +145,31 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
         cate, treatment, spend, 0.3, n_boot=n_boot, seed=1
     )
 
+    forest_sensitivity = []
+    for config in FOREST_SENSITIVITY:
+        sensitivity_forest = fit_causal_forest(
+            train,
+            seed=RANDOM_SEED,
+            n_estimators=500,
+            min_samples_leaf=config["min_samples_leaf"],
+            max_depth=config["max_depth"],
+        )
+        sensitivity_cate = predict_cate(sensitivity_forest, eval_df)
+        forest_sensitivity.append(
+            {
+                "label": config["label"],
+                "min_samples_leaf": config["min_samples_leaf"],
+                "max_depth": config["max_depth"],
+                "normalized_qini": normalized_qini_score(sensitivity_cate, treatment, visit),
+            }
+        )
+
     policy_forest = fit_policy_forest(train)
     learned = policy_forest_recommendations(policy_forest, eval_df)
     policies = {
         "learned (DRPolicyForest)": learned,
         "email everyone (mens creative)": np.full(len(eval_df), "Mens E-Mail"),
+        "email everyone (womens creative)": np.full(len(eval_df), "Womens E-Mail"),
         "purchase-history heuristic": heuristic_recommendations(eval_df),
         "email nobody": np.full(len(eval_df), CONTROL_ARM),
     }
@@ -145,17 +192,87 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
         seed=3,
     )
 
+    policy_split_sensitivity = []
+    for seed in repeat_seeds:
+        split_train, split_eval = split_train_eval(df, seed=seed)
+        split_policy_forest = fit_policy_forest(split_train, seed=seed)
+        split_learned = policy_forest_recommendations(split_policy_forest, split_eval)
+        split_predictions = crossfit_arm_outcomes(split_eval, seed=seed)
+        split_policies = {
+            "learned (DRPolicyForest)": split_learned,
+            "email everyone (mens creative)": np.full(len(split_eval), "Mens E-Mail"),
+        }
+        split_values, split_comparisons = evaluate_policies(
+            split_eval,
+            split_policies,
+            split_predictions,
+            propensities=NOMINAL_PROPENSITIES,
+            n_boot=1,
+            seed=seed,
+        )
+        comparison = split_comparisons.loc[
+            "learned (DRPolicyForest) - email everyone (mens creative)"
+        ]
+        shares = pd.Series(split_learned).value_counts(normalize=True).reindex(ARMS, fill_value=0.0)
+        policy_split_sensitivity.append(
+            {
+                "seed": seed,
+                "learned_value": float(split_values.loc["learned (DRPolicyForest)", "value"]),
+                "blanket_mens_value": float(
+                    split_values.loc["email everyone (mens creative)", "value"]
+                ),
+                "learned_minus_blanket_mens": float(comparison["difference"]),
+                "recommendation_shares": {arm: float(shares[arm]) for arm in ARMS},
+            }
+        )
+    spend_predictions = crossfit_arm_outcomes(eval_df, outcome_col="spend")
+    spend_values, spend_comparisons = evaluate_policies(
+        eval_df,
+        policies,
+        spend_predictions,
+        propensities=NOMINAL_PROPENSITIES,
+        outcome_col="spend",
+        n_boot=n_boot,
+        seed=4,
+    )
+    learned_spend = float(spend_values.loc["learned (DRPolicyForest)", "value"])
+    no_email_spend = float(spend_values.loc["email nobody", "value"])
+    contact_rate = float(np.mean(learned != CONTROL_ARM))
+    margin_sensitivity = []
+    for margin in (0.25, 0.50, 1.00):
+        margin_sensitivity.append(
+            {
+                "gross_margin": margin,
+                "incremental_net_value": incremental_net_value(
+                    learned_spend,
+                    no_email_spend,
+                    contact_rate,
+                    margin,
+                    0.10,
+                ),
+            }
+        )
+
     repeated = pd.DataFrame(repeated_rows)
     results = {
-        "schema_version": 1,
+        "schema_version": 2,
         "metadata": provenance,
         "headline": {
             "pooled_ate": records_for_json(pooled),
             "per_arm_ate": records_for_json(per_arm),
+            "deduplicated_visit_sensitivity": {
+                "full_rows": int(len(df)),
+                "deduplicated_rows": int(len(deduplicated)),
+                "full_visit_difference": pooled_visit_difference(df),
+                "deduplicated_visit_difference": pooled_visit_difference(deduplicated),
+            },
         },
         "interactions": {
+            "analysis": "post-hoc held-out interaction audit",
+            "n": int(len(eval_df)),
             "joint_p_value": joint_p,
-            "terms": records_for_json(interactions),
+            "segment_effects": records_for_json(segment_effects),
+            "contrasts": records_for_json(contrasts),
         },
         "ranking": {
             "cate_summary": {
@@ -173,6 +290,10 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
             },
             "repeated_splits": records_for_json(repeated.set_index("seed")),
             "repeated_summary": summarize_repeated_qini(repeated),
+            "repeated_split_note": (
+                "repeated sample splits are sensitivity evidence, not independent replications"
+            ),
+            "forest_sensitivity": forest_sensitivity,
             "deciles": records_for_json(deciles),
             "top_k": records_for_json(top_k),
             "gross_spend_top_30": {
@@ -190,7 +311,31 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
             "recommendation_counts": {
                 arm: int(count) for arm, count in pd.Series(learned).value_counts().items()
             },
+            "recommendation_shares": {
+                arm: float(
+                    pd.Series(learned)
+                    .value_counts(normalize=True)
+                    .reindex(ARMS, fill_value=0.0)[arm]
+                )
+                for arm in ARMS
+            },
             "conclusion": policy_conclusion(comparisons),
+            "split_sensitivity": policy_split_sensitivity,
+        },
+        "reported_spend_sensitivity": {
+            "analysis": "evaluation of a visit-optimised policy; reported spend is not profit",
+            "values": records_for_json(spend_values),
+            "comparisons": records_for_json(spend_comparisons),
+            "contact_rate": contact_rate,
+            "email_cost_usd": 0.10,
+            "break_even_gross_margin": break_even_margin(
+                learned_spend, no_email_spend, contact_rate, 0.10
+            ),
+            "margin_sensitivity": margin_sensitivity,
+        },
+        "simulation": {
+            "analysis": "semi-synthetic Monte Carlo stress test with known data-generating effects",
+            "rows": records_for_json(run_monte_carlo()),
         },
     }
     serving_payload = {
@@ -198,6 +343,9 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
         "cate": cate,
         "policy_values": policy_values,
         "policy_comparisons": comparisons,
+        "spend_policy_values": spend_values,
+        "spend_policy_comparisons": spend_comparisons,
+        "learned_contact_rate": contact_rate,
     }
     save_results(results)
     save_evaluation_artifacts(serving_payload, metadata=provenance)

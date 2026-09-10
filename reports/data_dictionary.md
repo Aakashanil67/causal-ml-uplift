@@ -6,11 +6,12 @@ speciality-retail customer file: 64,000 customers who purchased in the previous 
 randomised into one of three arms and tracked for two weeks after the email went out.
 
 64,000 rows, 12 source columns, no nulls. There is no customer ID column, and 6,562 rows are exact
-duplicates of another row (7,634 rows involved). That is not a data error: with `recency`
+duplicates of another row (7,634 rows involved). Without customer identifiers, distinct identity
+cannot be verified. Rows are kept because deduplication could remove genuine customers; a
+deduplicated sensitivity check is reported separately. With `recency`
 restricted to 1–12, `history` sitting at the $29.99 floor for a large share of low-value customers,
 and every other covariate low-cardinality, dozens of genuinely different customers land on an
 identical combination of recency/history/mens/womens/zip/newbie/channel/arm/outcomes by chance.
-Nothing downstream keys on row identity, so this has no effect on any estimate in this project.
 
 | column | type | description |
 |---|---|---|
@@ -48,7 +49,7 @@ randomisation rather than a targeted campaign. The formal balance check on covar
 **`conversion` is a strict subset of `visit`.** Zero rows have `conversion=1` and `visit=0`: every
 buyer visited first, which is the sensible read of "visit" as "came to the site" and "conversion"
 as "bought while there." `src/data_loader.load_hillstrom()` asserts this on every load, since two
-downstream design choices depend on it: treating `visit` as the well-powered outcome for
+downstream design choices depend on it: treating `visit` as the outcome with enough events for
 heterogeneity work, and treating `conversion`/`spend` as the same underlying rare event.
 
 **`spend` may be top-coded at exactly $499.00.** Twelve customers show `spend == 499.00` to the
@@ -63,9 +64,9 @@ so it should not be called a lower bound.
 
 ## Statistical power, and why heterogeneity work targets `visit`
 
-| outcome | events | rate | powered for CATE? |
+| outcome | events | rate | suitable for exploratory CATE modelling? |
 |---|---|---|---|
-| `visit` | 9,394 | 14.68% | yes |
+| `visit` | 9,394 | 14.68% | event density supports exploratory modelling |
 | `conversion` | 578 | 0.90% | no |
 | `spend` (non-zero) | 578 | 0.90% | no |
 
