@@ -81,8 +81,6 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
     df = load_hillstrom()
     pooled = pooled_ate_table(df)
     per_arm = per_arm_ate_table(df)
-    interactions, joint_p = interaction_test(df)
-
     repeated_rows = []
     primary = None
     for seed in repeat_seeds:
@@ -103,6 +101,7 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
         raise ValueError(f"repeat_seeds must include the primary seed {RANDOM_SEED}.")
 
     train, eval_df, cate = primary
+    segment_effects, contrasts, joint_p = interaction_test(eval_df)
     treatment = eval_df[TREATMENT_COL].to_numpy()
     visit = eval_df["visit"].to_numpy(dtype=float)
     spend = eval_df["spend"].to_numpy(dtype=float)
@@ -147,15 +146,18 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
 
     repeated = pd.DataFrame(repeated_rows)
     results = {
-        "schema_version": 1,
+        "schema_version": 2,
         "metadata": provenance,
         "headline": {
             "pooled_ate": records_for_json(pooled),
             "per_arm_ate": records_for_json(per_arm),
         },
         "interactions": {
+            "analysis": "post-hoc held-out interaction audit",
+            "n": int(len(eval_df)),
             "joint_p_value": joint_p,
-            "terms": records_for_json(interactions),
+            "segment_effects": records_for_json(segment_effects),
+            "contrasts": records_for_json(contrasts),
         },
         "ranking": {
             "cate_summary": {

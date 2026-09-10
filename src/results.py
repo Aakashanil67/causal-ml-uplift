@@ -17,7 +17,7 @@ from src.config import (
     ROOT,
 )
 
-RESULTS_SCHEMA_VERSION = 1
+RESULTS_SCHEMA_VERSION = 2
 REQUIRED_SECTIONS = {"metadata", "headline", "interactions", "ranking", "policy"}
 PROVENANCE_PACKAGES = ("econml", "lightgbm", "numpy", "pandas", "scikit-learn")
 
@@ -95,6 +95,10 @@ def validate_results(results: dict) -> None:
     missing = REQUIRED_SECTIONS - set(results)
     if missing:
         raise ValueError(f"Results missing sections: {', '.join(sorted(missing))}")
+    required_interactions = {"analysis", "joint_p_value", "segment_effects", "contrasts"}
+    missing_interactions = required_interactions - set(results["interactions"])
+    if missing_interactions:
+        raise ValueError("Results interactions missing: " + ", ".join(sorted(missing_interactions)))
 
     metadata = results["metadata"]
     required_metadata = {
