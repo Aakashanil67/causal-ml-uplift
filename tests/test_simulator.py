@@ -27,6 +27,18 @@ def test_streamlit_request_path_does_not_fit_causal_models():
     assert "fit_policy_forest" not in called
 
 
+def test_policy_tab_exposes_manifest_backed_decision_controls():
+    source = (Path(__file__).resolve().parent.parent / "app" / "simulator.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert '"email everyone (womens creative)"' in source or "recommendation_shares" in source
+    assert "Assumed gross margin" in source
+    assert "Cost per email" in source
+    assert "reported and capped" in source
+    assert "not profit" in source
+
+
 @pytest.mark.slow
 def test_app_runs_end_to_end_without_exceptions():
     # Exercises both tabs against the committed artifacts. This remains marked slow because

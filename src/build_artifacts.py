@@ -343,6 +343,9 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
         "cate": cate,
         "policy_values": policy_values,
         "policy_comparisons": comparisons,
+        "spend_policy_values": spend_values,
+        "spend_policy_comparisons": spend_comparisons,
+        "learned_contact_rate": contact_rate,
     }
     save_results(results)
     save_evaluation_artifacts(serving_payload, metadata=provenance)
