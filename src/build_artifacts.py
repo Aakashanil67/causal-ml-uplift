@@ -122,6 +122,14 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
 
     train, eval_df, cate = primary
     segment_effects, contrasts, joint_p = interaction_test(eval_df)
+
+    def pooled_visit_difference(frame: pd.DataFrame) -> float:
+        return float(
+            frame.loc[frame[TREATMENT_COL] == 1, "visit"].mean()
+            - frame.loc[frame[TREATMENT_COL] == 0, "visit"].mean()
+        )
+
+    deduplicated = df.drop_duplicates().reset_index(drop=True)
     treatment = eval_df[TREATMENT_COL].to_numpy()
     visit = eval_df["visit"].to_numpy(dtype=float)
     spend = eval_df["spend"].to_numpy(dtype=float)
@@ -252,6 +260,12 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
         "headline": {
             "pooled_ate": records_for_json(pooled),
             "per_arm_ate": records_for_json(per_arm),
+            "deduplicated_visit_sensitivity": {
+                "full_rows": int(len(df)),
+                "deduplicated_rows": int(len(deduplicated)),
+                "full_visit_difference": pooled_visit_difference(df),
+                "deduplicated_visit_difference": pooled_visit_difference(deduplicated),
+            },
         },
         "interactions": {
             "analysis": "post-hoc held-out interaction audit",

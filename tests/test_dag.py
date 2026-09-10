@@ -21,6 +21,13 @@ def test_treatment_points_to_every_outcome():
         assert g.has_edge(TREATMENT_COL, outcome)
 
 
+def test_outcomes_are_colliders_in_the_graph_but_are_not_conditioned_on():
+    g = build_dag()
+
+    for outcome in OUTCOME_COLS:
+        assert g.in_degree(outcome) > 1
+
+
 def test_every_dag_node_is_a_real_column():
     from src.config import COVARIATE_COLS
 

@@ -3,7 +3,7 @@
 [![CI](https://github.com/Aakashanil67/causal-ml-uplift/actions/workflows/ci.yml/badge.svg)](https://github.com/Aakashanil67/causal-ml-uplift/actions/workflows/ci.yml)
 ![Python 3.12](https://img.shields.io/badge/python-3.12-blue)
 
-Who does a marketing email actually persuade, on a real randomised experiment: DoWhy identification, EconML Double ML and causal forests, validated against a constructed confounding benchmark, refutation-tested, and shipped as an interactive what-if simulator.
+Can causal ML find deployable treatment-effect heterogeneity, or only a reliable average effect? This project tests that distinction on Hillstrom's randomised email experiment.
 
 **[Full report (PDF)](reports/causal_report.pdf)** · **[live simulator](https://causal-ml-uplift.streamlit.app/)** · Hillstrom e-mail experiment, 64,000 customers, three arms.
 
@@ -13,7 +13,7 @@ Who does a marketing email actually persuade, on a real randomised experiment: D
 
 "Customers who got the email visited more" is not the same claim as "the email caused them to visit," and most portfolio projects that use an email dataset don't distinguish the two: they report a correlation and call it insight. Hillstrom's data lets the distinction actually be tested rather than argued, because treatment was randomly assigned before the campaign ran (`reports/01_causal_question.md`), and the covariate balance check that would expose a violation of that design is run and reported, not skipped (`reports/02_naive_estimate.md`: largest standardised difference across 11 covariates is 0.0088, an order of magnitude under the usual 0.1 threshold).
 
-The harder, more interesting problem the rest of this project is built around: does Double ML actually correct for confounding, or does it just agree with everything else because there was nothing to correct? `reports/06_confounding_benchmark.md` answers that with a number, not an assertion, by manufacturing real confounding from the same real data and checking whether DML sees through it.
+The harder, more interesting problem the rest of this project is built around: does Double ML actually correct for confounding, or does it just agree with everything else because there was nothing to correct? `reports/06_confounding_benchmark.md` contains a constructed selection stress test, while the manifest also reports a semi-synthetic Monte Carlo benchmark with known effects.
 
 ## Results
 
@@ -33,7 +33,8 @@ Three-action policies are evaluated with cross-fitted doubly robust scores:
 |---|---:|---:|
 | learned (DRPolicyForest) | 0.1823 | [0.1730, 0.1916] |
 | email everyone (mens creative) | 0.1810 | [0.1719, 0.1902] |
-| purchase-history heuristic | 0.1803 | [0.1706, 0.1900] |
+| email everyone (womens creative) | 0.1520 | [0.1433, 0.1615] |
+| purchase-history heuristic | 0.1848 | [0.1751, 0.1940] |
 | email nobody | 0.1070 | [0.0994, 0.1151] |
 
 Learned minus blanket mens is +0.0013 [-0.0014, +0.0040]. That is not a policy win. Blanket mens emailing is the simpler action supported by this experiment; personalised deployment needs new evidence.
@@ -71,7 +72,7 @@ gate.
 
 - **Placebo, random-common-cause and data-subset refuters are implemented by hand** (`src/refute.py`), not via DoWhy's `refute_estimate()` wrapper, because that wrapper's econml integration passes categorical effect-modifier columns straight to econml's numeric `.effect()` without dummy-encoding them and fails with a real `KeyError` on this project's `channel`/`zip_code` columns. Writing the refuters directly against `src/dml_ate.py`'s own estimator also means the *actual* model this project reports stays under test, not a substitute.
 - **The confounding-benchmark's "withheld confounder" variant confounds on `newbie`, not on `recency`/`history` with one column dropped.** The first version tried the latter and it didn't produce a clean failure: `recency`, still observed, was correlated enough with the selection mechanism to partially self-correct (reproduced in `notebooks/01_exploration.ipynb`). `newbie` is close to orthogonal to the other covariates and has a standalone effect on `visit` comparable in size to the treatment effect itself, so withholding it produces a genuine, unambiguous failure worth reporting.
-- **`Qini` is computed by hand** (`src/uplift.py`), not via `scikit-uplift`, so every number in the targeting-economics section can be defended line by line. Cross-checked against `sklift.metrics.qini_auc_score` in one test for sign agreement.
+- **Qini's cumulative gain curve and raw area are computed locally** (`src/uplift.py`). Normalized Qini uses `sklift.metrics.qini_auc_score` and is verified on fixed fixtures.
 - **`CausalForestDML`/`DRPolicyForest` heterogeneity work targets `visit` only.** `conversion` and `spend` have 578 non-zero events total across 64,000 rows, nowhere near enough to split across a forest's leaves without the CATE surface being mostly noise (`reports/data_dictionary.md`).
 - **The production model artifact (`models/causal_forest.joblib`, 34.47MB) is committed to git**, refit on the full 64,000 rows rather than the 70% split used for honest evaluation, since heterogeneity was already validated on held-out data before this refit happens. Under this project's own 50MB threshold for needing a distilled LightGBM surrogate instead, so the real forest ships.
 - **`starlette` is pinned to `0.52.1`** in `requirements.txt`, one release behind Streamlit 1.61.0's own declared range. Starlette shipped a breaking 1.0 release days before this build, and its new ASGI GZip middleware crashes Streamlit's server with a real `TypeError` on the version pip resolves without the pin.

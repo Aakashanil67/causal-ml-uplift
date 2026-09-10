@@ -45,9 +45,9 @@ CATEGORICAL_LEVELS = {
     "channel": ["Multichannel", "Phone", "Web"],
 }
 
-# heterogeneity is only well-powered on visit (~9,000 events across 64,000 rows) — conversion and
-# spend have 578 non-zero outcomes total, so CATE work targets visit specifically; see
-# reports/data_dictionary.md for the power check this constant is based on.
+# heterogeneity work targets visit (~9,000 events across 64,000 rows) — conversion and spend have
+# 578 non-zero outcomes total, so CATE work is exploratory and targets visit specifically; see
+# reports/data_dictionary.md for the event-density rationale.
 CATE_OUTCOME = "visit"
 
 # 70/30, stratified on arm and CATE_OUTCOME — every CATE/Qini number reported comes from the 30%
