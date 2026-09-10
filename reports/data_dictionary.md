@@ -49,7 +49,7 @@ randomisation rather than a targeted campaign. The formal balance check on covar
 **`conversion` is a strict subset of `visit`.** Zero rows have `conversion=1` and `visit=0`: every
 buyer visited first, which is the sensible read of "visit" as "came to the site" and "conversion"
 as "bought while there." `src/data_loader.load_hillstrom()` asserts this on every load, since two
-downstream design choices depend on it: treating `visit` as the well-powered outcome for
+downstream design choices depend on it: treating `visit` as the outcome with enough events for
 heterogeneity work, and treating `conversion`/`spend` as the same underlying rare event.
 
 **`spend` may be top-coded at exactly $499.00.** Twelve customers show `spend == 499.00` to the

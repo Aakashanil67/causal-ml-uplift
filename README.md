@@ -56,17 +56,15 @@ Learned minus blanket mens is +0.0013 [-0.0014, +0.0040]. That is not a policy w
 ## How to run it
 
 ```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-python -m src.pipeline
-streamlit run app/simulator.py
+py -3.12 -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe -m src.pipeline
+.venv\Scripts\python.exe -m streamlit run app/simulator.py
 ```
 
-On macOS or Linux, activate with `source .venv/bin/activate`. The pipeline regenerates the
-manifest, serving artifacts, Markdown reports, figures, production model and PDF in dependency
-order. Run `pytest -v` for tests and `ruff check . && ruff format --check .` for the code-quality
-gate.
+On macOS or Linux, use `.venv/bin/python` in place of the Windows path. The pipeline regenerates
+the manifest, serving artifacts, Markdown reports, figures, production model and PDF in dependency
+order. `scripts/verify.ps1` runs the pinned-environment quality gate.
 
 ## Design decisions and trade-offs
 

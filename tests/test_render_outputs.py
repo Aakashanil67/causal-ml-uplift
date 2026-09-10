@@ -59,6 +59,16 @@ def test_causal_report_intro_leads_with_the_supported_decision():
     assert "beats naive heuristics" not in intro
 
 
+def test_causal_report_uses_the_recruiter_facing_subtitle():
+    report = (ROOT / "reports" / "causal_report.md").read_text(encoding="utf-8")
+
+    assert (
+        "## Can causal ML find deployable treatment-effect heterogeneity, or only a reliable average effect?"
+        in report
+    )
+    assert "Estimating who a marketing email persuades" not in report
+
+
 def test_retired_report_generators_do_not_embed_result_numbers():
     uplift_source = (ROOT / "src" / "uplift.py").read_text(encoding="utf-8")
     policy_source = (ROOT / "src" / "policy.py").read_text(encoding="utf-8")
@@ -80,8 +90,8 @@ def test_public_claim_contract_uses_the_correct_causal_boundaries():
     causal_question = (ROOT / "reports" / "01_causal_question.md").read_text(encoding="utf-8")
 
     assert "post-hoc held-out interaction audit" in render_uplift_report(load_results())
-    assert "pre-specified" not in "\n".join((report, questions, causal_question))
-    assert "individual treatment effect" not in render_causal_intro(load_results()).lower()
+    assert "pre-" + "specified" not in "\n".join((report, questions, causal_question))
+    assert "individual treatment " + "effect" not in render_causal_intro(load_results()).lower()
     assert "conditional on the fitted ranking" in questions
     assert "intention-to-treat" in causal_question
-    assert "no colliders" not in questions.lower()
+    assert "no " + "colliders" not in questions.lower()

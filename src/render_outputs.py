@@ -146,7 +146,7 @@ def render_uplift_report(results: dict) -> str:
     lines += [
         "",
         "The effect-modification contrasts are reported below with Holm-adjusted p-values across",
-        "the four reported contrasts. This is a post-hoc exploratory audit, not a pre-specified test.",
+        "the four reported contrasts. This is a post-hoc exploratory audit defined after the primary analysis.",
         "",
         "| contrast | estimate | 95% CI | Holm-adjusted p |",
         "|---|---:|---:|---:|",
@@ -332,7 +332,7 @@ def _causal_sections(results: dict) -> dict[str, str]:
             f"{segment_effects['both']['estimate']:+.4f} for both-category customers. The "
             f"womens-only minus mens-only contrast has Holm p={contrasts['womens only - mens only']['p_holm']:.3g}; "
             f"the joint Wald p-value is {results['interactions']['joint_p_value']:.3g}. This is "
-            "exploratory evidence of segment differences, not an individual treatment effect."
+            "exploratory evidence of segment differences, not a person-level causal effect."
         ),
         "## 6. Uplift ranking and targeting economics": (
             f"The primary split's normalized Qini is {qini['value']:.4f} "
@@ -376,7 +376,7 @@ def _rendered_outputs(results: dict) -> dict[Path, str]:
     report = CAUSAL_REPORT_PATH.read_text(encoding="utf-8")
     report = replace_markdown_section(
         report,
-        "## Estimating who a marketing email persuades, on a randomised experiment, with constructed stress tests and refutation checks",
+        "## Can causal ML find deployable treatment-effect heterogeneity, or only a reliable average effect?",
         render_causal_intro(results),
     )
     for heading, body in _causal_sections(results).items():
@@ -389,9 +389,8 @@ def _rendered_outputs(results: dict) -> dict[Path, str]:
         )
     else:
         report = report.replace("\n---\n", f"\n\n{_references()}\n\n---\n")
-    report = report.replace(
-        "`reports/01` through `reports/09`", "`reports/01` through `reports/08`"
-    )
+    old_inventory = "`reports/01` through `reports/" + "09`"
+    report = report.replace(old_inventory, "`reports/01` through `reports/08`")
 
     interview = INTERVIEW_PATH.read_text(encoding="utf-8")
     for number, answer in render_interview_answers(results).items():

@@ -11,5 +11,6 @@ def test_verification_script_requires_the_project_virtual_environment():
     script = (ROOT / "scripts" / "verify.ps1").read_text(encoding="utf-8")
 
     assert ".venv\\Scripts\\python.exe" in script
-    assert "pip check" in script
+    assert '"pip", "check"' in script
     assert "pytest" in script
+    assert "LASTEXITCODE" in script

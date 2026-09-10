@@ -61,3 +61,6 @@ def test_app_runs_end_to_end_without_exceptions():
     assert metrics["Incremental visits per customer emailed"] == "+0.0603"
     warnings = [item.value for item in at.warning]
     assert any("Normalized Qini" in text and "includes zero" in text for text in warnings)
+    assert any(item.label == "Assumed gross margin" for item in at.get("slider"))
+    assert any(item.label == "Cost per email" for item in at.get("number_input"))
+    assert any("reported and capped" in text and "not profit" in text for text in warnings)
