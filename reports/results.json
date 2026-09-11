@@ -148,8 +148,8 @@
       "zip_code",
       "channel"
     ],
-    "git_dirty": true,
-    "git_sha": "5d4505a13f5b",
+    "git_dirty": false,
+    "git_sha": "3edc70a838a3",
     "packages": {
       "econml": "0.16.0",
       "lightgbm": "4.7.0",
@@ -333,7 +333,7 @@
     "cate_summary": {
       "max": 0.12915934475560067,
       "mean": 0.06031053776029973,
-      "min": -0.007257459259963845,
+      "min": -0.007257459259963842,
       "std": 0.023000337969603015
     },
     "deciles": [
@@ -359,7 +359,7 @@
         "decile": 3,
         "n": 1920,
         "observed_uplift": 0.08559194742501629,
-        "pred_cate_mean": 0.06844329809612847
+        "pred_cate_mean": 0.06844329809612848
       },
       {
         "decile": 4,
