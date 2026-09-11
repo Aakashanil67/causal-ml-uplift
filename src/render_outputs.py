@@ -1,15 +1,21 @@
 """Render public Markdown from the versioned results manifest."""
 
+import hashlib
 import re
 from pathlib import Path
 
-from src.config import REPORTS_DIR, ROOT
+from src.config import MODELS_DIR, REPORTS_DIR, ROOT
 from src.results import load_results
 
 README_PATH = ROOT / "README.md"
 UPLIFT_REPORT_PATH = REPORTS_DIR / "07_uplift_policy.md"
 CAUSAL_REPORT_PATH = REPORTS_DIR / "causal_report.md"
 INTERVIEW_PATH = REPORTS_DIR / "interview_qa.md"
+MODEL_README_PATH = MODELS_DIR / "README.md"
+MODEL_ARTIFACT_PATHS = (
+    MODELS_DIR / "causal_forest.joblib",
+    MODELS_DIR / "evaluation_artifacts.joblib",
+)
 
 
 def replace_markdown_section(text: str, heading: str, body: str) -> str:
@@ -29,6 +35,24 @@ def replace_markdown_section(text: str, heading: str, body: str) -> str:
 
 def _table_by(records: list[dict], key: str) -> dict[str, dict]:
     return {row[key]: row for row in records}
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def render_model_readme() -> str:
+    readme = MODEL_README_PATH.read_text(encoding="utf-8")
+    marker = "Current artifact checksums:"
+    prefix, separator, _old_hashes = readme.partition(marker)
+    if not separator:
+        raise ValueError(f"Heading not found: {marker}")
+    hashes = "\n".join(f"- `{path.name}`: `{_sha256(path)}`" for path in MODEL_ARTIFACT_PATHS)
+    return f"{prefix}{marker}\n\n{hashes}\n"
 
 
 def render_readme_results(results: dict) -> str:
@@ -403,6 +427,7 @@ def _rendered_outputs(results: dict) -> dict[Path, str]:
         UPLIFT_REPORT_PATH: render_uplift_report(results),
         CAUSAL_REPORT_PATH: report,
         INTERVIEW_PATH: interview,
+        MODEL_README_PATH: render_model_readme(),
     }
 
 
