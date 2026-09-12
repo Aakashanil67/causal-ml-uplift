@@ -148,8 +148,8 @@
       "zip_code",
       "channel"
     ],
-    "git_dirty": true,
-    "git_sha": "57d15d2911e4",
+    "git_dirty": false,
+    "git_sha": "3edc70a838a3",
     "packages": {
       "econml": "0.16.0",
       "lightgbm": "4.7.0",
@@ -158,7 +158,7 @@
       "scikit-learn": "1.5.2"
     },
     "random_seed": 42,
-    "source_sha256": "5dcabb5b07f9c892470fdb973cad724f6154cdda1f04e16cbc68094282f9990e"
+    "source_sha256": "9fe799b213e99b752222ce843a1343e8faed52977b56596b6aca14cafe86b7ba"
   },
   "policy": {
     "comparisons": [
@@ -333,8 +333,8 @@
     "cate_summary": {
       "max": 0.12915934475560067,
       "mean": 0.06031053776029973,
-      "min": -0.007257459259963843,
-      "std": 0.023000337969603008
+      "min": -0.007257459259963842,
+      "std": 0.023000337969603015
     },
     "deciles": [
       {
@@ -395,7 +395,7 @@
         "decile": 9,
         "n": 1920,
         "observed_uplift": 0.045837868742509696,
-        "pred_cate_mean": 0.020710895435530792
+        "pred_cate_mean": 0.020710895435530795
       }
     ],
     "forest_sensitivity": [
