@@ -8,6 +8,7 @@ def test_pipeline_runs_artifacts_then_markdown_then_pdf():
         build=lambda: calls.append("artifacts"),
         render=lambda: calls.append("markdown"),
         pdf=lambda: calls.append("pdf"),
+        verify=lambda: calls.append("verify"),
     )
 
-    assert calls == ["artifacts", "markdown", "pdf"]
+    assert calls == ["artifacts", "markdown", "pdf", "verify"]

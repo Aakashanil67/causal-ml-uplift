@@ -7,13 +7,29 @@ from src.policy import (
     _treatment_name_to_arm,
     bootstrap_policy_difference_ci,
     break_even_margin,
+    dr_policy_contributions,
     dr_policy_value,
     heuristic_recommendations,
     incremental_net_value,
+    incremental_net_value_interval,
+    incremental_net_value_with_interval,
     ipw_policy_value,
+    policy_comparison_conclusion,
     policy_value_contributions,
     stratified_bootstrap_indices,
 )
+
+
+@pytest.mark.parametrize(
+    ("low", "high", "expected"),
+    [
+        (-0.01, 0.02, "does not establish which policy"),
+        (0.002, 0.018, "higher expected visit value for the learned policy"),
+        (-0.03, -0.004, "higher expected visit value for blanket mens emailing"),
+    ],
+)
+def test_policy_comparison_conclusion_follows_paired_interval(low, high, expected):
+    assert expected in policy_comparison_conclusion(low, high)
 
 
 def test_incremental_net_value_uses_gross_margin_and_contact_cost():
@@ -24,6 +40,25 @@ def test_break_even_margin_is_explicit_about_unprofitable_or_zero_contact_cases(
     assert break_even_margin(1.42, 0.65, 1.0, 0.10) == pytest.approx(0.10 / 0.77)
     assert break_even_margin(0.65, 0.65, 0.0, 0.10) == 0.0
     assert break_even_margin(0.60, 0.65, 1.0, 0.10) is None
+
+
+def test_incremental_net_value_interval_recalculates_both_endpoints():
+    low, high = incremental_net_value_interval(-0.0953, 0.9166, 0.72, 0.30, 0.10)
+
+    assert low == pytest.approx(-0.10059)
+    assert high == pytest.approx(0.20298)
+
+
+def test_zero_margin_interval_keeps_contact_cost_negative():
+    low, high = incremental_net_value_interval(-0.0953, 0.9166, 0.72, 0.0, 0.10)
+
+    assert (low, high) == pytest.approx((-0.072, -0.072))
+
+
+def test_net_value_summary_shows_uncertainty_crossing_zero():
+    result = incremental_net_value_with_interval(0.77, 0.1447, 1.0819, 0.72, 0.30, 0.10)
+
+    assert result == pytest.approx({"value": 0.159, "ci_low": -0.02859, "ci_high": 0.25257})
 
 
 def test_treatment_name_to_arm_maps_none_to_control():
@@ -133,6 +168,62 @@ def test_dr_policy_value_uses_outcome_model_for_every_customer():
     # Baseline model contribution is 0.8 for everyone. The one matched mens row adds
     # (1.0 - 0.8) / (1/3), so the average is (0.8 + 1.4 + 0.8) / 3 = 1.0.
     assert value == pytest.approx(1.0)
+
+
+def test_dr_policy_contributions_align_reordered_unique_prediction_indices():
+    df = pd.DataFrame(
+        {ARM_COL: ["No E-Mail", "Mens E-Mail"], "visit": [0.0, 1.0]},
+        index=["customer-a", "customer-b"],
+    )
+    predictions = pd.DataFrame(
+        {
+            "No E-Mail": [0.2, 0.1],
+            "Mens E-Mail": [0.8, 0.7],
+            "Womens E-Mail": [0.3, 0.4],
+        },
+        index=["customer-b", "customer-a"],
+    )
+    recommendations = np.array(["Mens E-Mail", "Mens E-Mail"])
+
+    contributions = dr_policy_contributions(
+        df, recommendations, "visit", NOMINAL_PROPENSITIES, predictions
+    )
+
+    assert contributions == pytest.approx([0.7, 1.4])
+
+
+def test_dr_policy_contributions_reject_mismatched_prediction_ids():
+    df = pd.DataFrame({ARM_COL: ["No E-Mail"], "visit": [0.0]}, index=["customer-a"])
+    predictions = pd.DataFrame(
+        {"No E-Mail": [0.1], "Mens E-Mail": [0.8], "Womens E-Mail": [0.2]},
+        index=["customer-b"],
+    )
+
+    with pytest.raises(ValueError, match="indices must match"):
+        dr_policy_contributions(
+            df, np.array(["Mens E-Mail"]), "visit", NOMINAL_PROPENSITIES, predictions
+        )
+
+
+@pytest.mark.parametrize(
+    "recommendations,propensities,match",
+    [
+        (np.array(["Unknown Arm"]), NOMINAL_PROPENSITIES, "unsupported action"),
+        (
+            np.array(["Mens E-Mail"]),
+            {**NOMINAL_PROPENSITIES, "No E-Mail": 0.0},
+            "strictly positive",
+        ),
+    ],
+)
+def test_dr_policy_contributions_reject_invalid_action_or_propensity(
+    recommendations, propensities, match
+):
+    df = pd.DataFrame({ARM_COL: ["No E-Mail"], "visit": [0.0]})
+    predictions = pd.DataFrame({"No E-Mail": [0.1], "Mens E-Mail": [0.8], "Womens E-Mail": [0.2]})
+
+    with pytest.raises(ValueError, match=match):
+        dr_policy_contributions(df, recommendations, "visit", propensities, predictions)
 
 
 def test_real_policy_evidence_supports_only_the_no_email_comparison():

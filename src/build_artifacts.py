@@ -1,11 +1,17 @@
-"""Regenerate the numerical manifest and compact artifacts used by Streamlit."""
+"""Regenerate the numerical manifest, figures, reports, and compact serving artifacts."""
+
+import hashlib
 
 import numpy as np
 import pandas as pd
 
 from src.cate import (
     fit_causal_forest,
+    heterogeneity_by_bin,
     heterogeneity_by_purchase_history,
+    plot_cate_distribution,
+    plot_heterogeneity_by_covariate,
+    plot_heterogeneity_by_purchase_history,
     predict_cate,
     split_train_eval,
 )
@@ -13,27 +19,35 @@ from src.config import (
     ARM_COL,
     ARMS,
     CONTROL_ARM,
+    COVARIATE_COLS,
+    FIGURES_DIR,
     NOMINAL_PROPENSITIES,
     RANDOM_SEED,
     TREATMENT_COL,
 )
+from src.dag import build_dag, draw_dag
 from src.dml_ate import per_arm_ate_table, pooled_ate_table
 from src.evaluation import crossfit_arm_outcomes, evaluate_policies
+from src.identify import identify
 from src.interactions import interaction_test
+from src.naive import covariate_balance, naive_estimates
 from src.persist import fit_and_save
 from src.policy import (
     break_even_margin,
     fit_policy_forest,
     heuristic_recommendations,
     incremental_net_value,
+    policy_comparison_conclusion,
     policy_forest_recommendations,
 )
+from src.regression_baseline import average_marginal_effects, fit_logit, fit_ols
 from src.results import build_provenance, save_evaluation_artifacts, save_results
-from src.simulation import run_monte_carlo
+from src.simulation import run_extended_monte_carlo, run_monte_carlo
 from src.uplift import (
     bootstrap_normalized_qini_ci,
     bootstrap_uplift_per_email_ci,
     normalized_qini_score,
+    plot_qini_curve,
     qini_coefficient,
     qini_curve,
     summarize_repeated_qini,
@@ -56,25 +70,136 @@ def _native(value):
     return value
 
 
-def records_for_json(frame: pd.DataFrame) -> list[dict]:
-    return [
-        {key: _native(value) for key, value in row.items()}
-        for row in frame.reset_index().to_dict(orient="records")
-    ]
+def _sha256(path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def records_for_json(frame: pd.DataFrame, nullable_fields: tuple[str, ...] = ()) -> list[dict]:
+    """Convert a table to JSON-native records, allowing null only for named unavailable fields."""
+    records = []
+    for row in frame.reset_index().to_dict(orient="records"):
+        converted = {}
+        for key, value in row.items():
+            if key in nullable_fields:
+                native = _native(value)
+                if pd.isna(value) or (isinstance(native, (int, float)) and not np.isfinite(native)):
+                    converted[key] = None
+                    continue
+            converted[key] = _native(value)
+        records.append(converted)
+    return records
+
+
+def build_classical_sections(df: pd.DataFrame, pooled: pd.DataFrame) -> dict:
+    """Compute manifest-owned naive, regression, identification, and selection evidence."""
+    naive = naive_estimates(df, TREATMENT_COL)
+    balance = covariate_balance(df, TREATMENT_COL)
+
+    regression_estimates = []
+    logit_contrasts = {}
+    for outcome in ("visit", "conversion"):
+        contrasts = average_marginal_effects(fit_logit(df, outcome), df)
+        logit_contrasts[outcome] = records_for_json(contrasts)
+        treatment = contrasts.loc[TREATMENT_COL]
+        regression_estimates.append(
+            {
+                "outcome": outcome,
+                "contrast": TREATMENT_COL,
+                "effect": float(treatment["effect"]),
+                "ci_low": float(treatment["ci_low"]),
+                "ci_high": float(treatment["ci_high"]),
+                "kind": "average 0-to-1 change",
+            }
+        )
+    spend_model = fit_ols(df, "spend")
+    spend_ci = spend_model.conf_int().loc[TREATMENT_COL]
+    regression_estimates.append(
+        {
+            "outcome": "spend",
+            "contrast": TREATMENT_COL,
+            "effect": float(spend_model.params[TREATMENT_COL]),
+            "ci_low": float(spend_ci.iloc[0]),
+            "ci_high": float(spend_ci.iloc[1]),
+            "kind": "OLS coefficient",
+        }
+    )
+
+    identification_rows = _identification_records(df)
+
+    from src.confounded import run_variant
+
+    visit_reference = pooled.loc["visit"]
+    variants = {}
+    selected_samples = {}
+    for name, columns, directions, strength, withheld in (
+        ("observable", ["recency", "history"], {"recency": -1, "history": 1}, 1.2, None),
+        ("unmeasured", ["newbie"], {"newbie": -1}, 1.5, ["newbie"]),
+    ):
+        run = run_variant(df, "visit", columns, directions, strength, withhold=withheld)
+        selected_samples[name] = run["sample"]
+        variants[name] = {key: value for key, value in run.items() if key != "sample"}
+    variants["unmeasured"]["newbie_effect"] = next(
+        row["effect"] for row in logit_contrasts["visit"] if row["contrast"] == "newbie"
+    )
+
+    from src.refute import (
+        data_subset_refuter,
+        placebo_treatment_refuter,
+        random_common_cause_refuter,
+    )
+
+    selected_sample = selected_samples["unmeasured"]
+    selected_estimate = variants["unmeasured"]["dml"]["ate"]
+    refutations = {}
+    for name, sample, dropped, original in (
+        ("rct", df, None, float(visit_reference["ate"])),
+        ("selected_sample", selected_sample, ["newbie"], selected_estimate),
+    ):
+        refutations[name] = {
+            "reference_estimate": original,
+            "placebo": placebo_treatment_refuter(sample, "visit", drop_cols=dropped),
+            "random_cause": random_common_cause_refuter(sample, "visit", drop_cols=dropped),
+            "subset": data_subset_refuter(sample, "visit", drop_cols=dropped),
+        }
+
+    return {
+        "naive": {
+            "estimates": records_for_json(naive),
+            "balance": records_for_json(balance, nullable_fields=("standardised_diff",)),
+        },
+        "regression": {"estimates": regression_estimates, "logit_contrasts": logit_contrasts},
+        "identification": {"outcomes": identification_rows},
+        "confounding": {
+            "experimental_reference": {
+                "ate": float(visit_reference["ate"]),
+                "ci_low": float(visit_reference["ci_low"]),
+                "ci_high": float(visit_reference["ci_high"]),
+            },
+            "variants": variants,
+        },
+        "refutations": refutations,
+    }
+
+
+def _identification_records(df: pd.DataFrame) -> list[dict]:
+    rows = []
+    for outcome in ("visit", "conversion", "spend"):
+        _model, estimand = identify(df, outcome)
+        rows.append(
+            {
+                "outcome": outcome,
+                "estimand_type": str(estimand.estimand_type),
+                "backdoor_variables": list(estimand.get_backdoor_variables()),
+                "estimand": str(estimand.estimands.get("backdoor", "")),
+            }
+        )
+    return rows
 
 
 def policy_conclusion(comparisons: pd.DataFrame) -> str:
     label = "learned (DRPolicyForest) - email everyone (mens creative)"
     row = comparisons.loc[label]
-    if row["ci_low"] <= 0 <= row["ci_high"]:
-        return (
-            "Held-out evidence does not establish that the learned policy beats blanket mens "
-            "emailing. Blanket mens is the simpler evidence-supported action; personalised "
-            "policy deployment needs a new experiment or stronger cross-campaign evidence."
-        )
-    if row["ci_low"] > 0:
-        return "The learned policy beats blanket mens emailing on the held-out evaluation set."
-    return "Blanket mens emailing beats the learned policy on the held-out evaluation set."
+    return policy_comparison_conclusion(float(row["ci_low"]), float(row["ci_high"]))
 
 
 def _top_k_table(cate, treatment, outcome, n_boot):
@@ -88,13 +213,18 @@ def _top_k_table(cate, treatment, outcome, n_boot):
     return pd.DataFrame(rows).set_index("k")
 
 
-def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) -> dict:
+def build_all(
+    n_boot: int = 1000,
+    repeat_seeds: tuple[int, ...] = REPEAT_SEEDS,
+    full_simulation_runs: int = 500,
+) -> dict:
     from src.data_loader import load_hillstrom
 
     provenance = build_provenance()
     df = load_hillstrom()
     pooled = pooled_ate_table(df)
     per_arm = per_arm_ate_table(df)
+    classical = build_classical_sections(df, pooled)
     repeated_rows = []
     primary = None
     for seed in repeat_seeds:
@@ -144,6 +274,27 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
     spend_low, spend_high = bootstrap_uplift_per_email_ci(
         cate, treatment, spend, 0.3, n_boot=n_boot, seed=1
     )
+
+    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    draw_dag(build_dag(), COVARIATE_COLS)
+    plot_cate_distribution(cate, FIGURES_DIR / "cate_distribution.png")
+    plot_heterogeneity_by_purchase_history(
+        purchase_history, FIGURES_DIR / "cate_by_purchase_history.png"
+    )
+    plot_heterogeneity_by_covariate(
+        heterogeneity_by_bin(eval_df, cate, "recency"),
+        "recency",
+        FIGURES_DIR / "cate_by_recency.png",
+    )
+    plot_heterogeneity_by_covariate(
+        heterogeneity_by_bin(eval_df, cate, "history"),
+        "history",
+        FIGURES_DIR / "cate_by_history.png",
+    )
+    plot_qini_curve(curve, qini_coefficient(curve), FIGURES_DIR / "qini_curve.png")
+    figure_files = [
+        {"path": path.name, "sha256": _sha256(path)} for path in sorted(FIGURES_DIR.glob("*.png"))
+    ]
 
     forest_sensitivity = []
     for config in FOREST_SENSITIVITY:
@@ -238,6 +389,10 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
     learned_spend = float(spend_values.loc["learned (DRPolicyForest)", "value"])
     no_email_spend = float(spend_values.loc["email nobody", "value"])
     contact_rate = float(np.mean(learned != CONTROL_ARM))
+    contact_rates = {
+        name: float(np.mean(recommendation != CONTROL_ARM))
+        for name, recommendation in policies.items()
+    }
     margin_sensitivity = []
     for margin in (0.25, 0.50, 1.00):
         margin_sensitivity.append(
@@ -255,8 +410,10 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
 
     repeated = pd.DataFrame(repeated_rows)
     results = {
-        "schema_version": 2,
+        "schema_version": 3,
         "metadata": provenance,
+        **classical,
+        "figures": {"files": figure_files},
         "headline": {
             "pooled_ate": records_for_json(pooled),
             "per_arm_ate": records_for_json(per_arm),
@@ -327,6 +484,7 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
             "values": records_for_json(spend_values),
             "comparisons": records_for_json(spend_comparisons),
             "contact_rate": contact_rate,
+            "contact_rates": contact_rates,
             "email_cost_usd": 0.10,
             "break_even_gross_margin": break_even_margin(
                 learned_spend, no_email_spend, contact_rate, 0.10
@@ -334,8 +492,14 @@ def build_all(n_boot: int = 1000, repeat_seeds: tuple[int, ...] = REPEAT_SEEDS) 
             "margin_sensitivity": margin_sensitivity,
         },
         "simulation": {
-            "analysis": "semi-synthetic Monte Carlo stress test with known data-generating effects",
+            "analysis": (
+                "fully synthetic Monte Carlo; target is the sample average of known p1 - p0"
+            ),
             "rows": records_for_json(run_monte_carlo()),
+            "extended_rows": records_for_json(
+                run_extended_monte_carlo(n_runs=full_simulation_runs)
+            ),
+            "extended_repetitions": full_simulation_runs,
         },
     }
     serving_payload = {
