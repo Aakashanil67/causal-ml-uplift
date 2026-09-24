@@ -25,11 +25,21 @@ from src.config import (
     TREATMENT_COL,
 )
 from src.persist import load_model, predict_cate_for_profile
-from src.policy import incremental_net_value
+from src.policy import incremental_net_value_with_interval
 from src.results import load_evaluation_artifacts, load_results
 from src.uplift import qini_curve, uplift_per_email_at_k
 
 st.set_page_config(page_title="Causal ML Uplift Simulator", layout="wide")
+
+
+def format_probability_level(value: float) -> str:
+    """Display an outcome probability level as a percentage."""
+    return f"{value:.2%}"
+
+
+def format_probability_difference(value: float) -> str:
+    """Display a probability difference in percentage points."""
+    return f"{value * 100:+.2f} pp"
 
 
 @st.cache_resource(show_spinner="Loading the production CATE model...")
@@ -74,18 +84,21 @@ def profile_form() -> dict:
 
 def plot_cate_gauge(customer_cate: float, eval_cate: np.ndarray):
     fig, ax = plt.subplots(figsize=(7, 3.2))
-    ax.hist(eval_cate, bins=40, color="#c7d5ea", edgecolor="white")
+    ax.hist(eval_cate * 100, bins=40, color="#c7d5ea", edgecolor="white")
     ax.axvline(
-        customer_cate, color="#b5842b", linewidth=2.5, label=f"this customer: {customer_cate:+.4f}"
+        customer_cate * 100,
+        color="#b5842b",
+        linewidth=2.5,
+        label=f"this profile: {format_probability_difference(customer_cate)}",
     )
     ax.axvline(
-        eval_cate.mean(),
+        eval_cate.mean() * 100,
         color="#5b7fb5",
         linewidth=1.2,
         linestyle="--",
-        label=f"population mean: {eval_cate.mean():+.4f}",
+        label=f"held-out mean: {format_probability_difference(float(eval_cate.mean()))}",
     )
-    ax.set_xlabel("estimated CATE on visit")
+    ax.set_xlabel("estimated visit-rate difference (percentage points)")
     ax.set_yticks([])
     ax.set_title("Where this customer sits in the held-out CATE distribution")
     ax.legend(fontsize=8)
@@ -100,18 +113,23 @@ def render_profile_tab():
         "email mixture versus no email; it is not an individual-level causal guarantee."
     )
     profile = profile_form()
-    if not (profile["mens"] or profile["womens"]):
-        st.warning(
-            "This profile has no recorded product category. It is outside the observed purchase-history "
-            "segments used in the main interpretation, so treat its estimate as extrapolative."
-        )
     model = get_production_model()
     result = predict_cate_for_profile(model, profile)
+    if result["extrapolative"]:
+        st.warning(
+            "This profile has neither recorded product category. The estimate below is "
+            "extrapolative because this profile was not observed in the campaign."
+        )
 
     m1, m2, m3 = st.columns(3)
-    m1.metric("Estimated effect on visit probability", f"{result['cate']:+.2%}")
-    m2.metric("95% CI low", f"{result['ci_low']:+.2%}")
-    m3.metric("95% CI high", f"{result['ci_high']:+.2%}")
+    effect_label = (
+        "Extrapolative profile effect"
+        if result["extrapolative"]
+        else "Estimated change in visit rate"
+    )
+    m1.metric(effect_label, format_probability_difference(result["cate"]))
+    m2.metric("95% CI low", format_probability_difference(result["ci_low"]))
+    m3.metric("95% CI high", format_probability_difference(result["ci_high"]))
 
     if result["ci_low"] > 0:
         st.success(
@@ -143,11 +161,24 @@ def render_policy_tab():
     )
     artifact, results = get_public_artifacts()
     qini = results["ranking"]["normalized_qini"]
-    st.warning(
-        f"Normalized Qini is {qini['value']:.4f} "
-        f"[{qini['ci_low']:.4f}, {qini['ci_high']:.4f}]. The interval includes zero, so this "
-        "ranking is diagnostic rather than deployment-ready."
+    qini_text = (
+        f"Normalized Qini is {qini['value']:.4f} [{qini['ci_low']:.4f}, {qini['ci_high']:.4f}]. "
     )
+    if qini["ci_low"] <= 0 <= qini["ci_high"]:
+        st.warning(
+            qini_text
+            + "The interval crosses zero, so this ranking is diagnostic rather than deployment-ready."
+        )
+    elif qini["ci_low"] > 0:
+        st.info(
+            qini_text
+            + "The fixed-model interval is positive; cross-campaign validation is still needed before deployment."
+        )
+    else:
+        st.warning(
+            qini_text
+            + "The fixed-model interval is negative; the current ranking does not outperform random targeting."
+        )
     eval_df, eval_cate = get_eval_artifacts()
     T = eval_df[TREATMENT_COL].to_numpy()
     Y = eval_df["visit"].to_numpy(dtype=float)
@@ -161,7 +192,10 @@ def render_policy_tab():
 
     m1, m2, m3 = st.columns(3)
     m1.metric("Customers targeted", f"{n_targeted:,} / {n:,}")
-    m2.metric("Incremental visits per customer emailed", f"{uplift_per_email:+.4f}")
+    m2.metric(
+        "Incremental visit-rate difference per customer emailed",
+        format_probability_difference(uplift_per_email),
+    )
     m3.metric("Total incremental visits (this eval set)", f"{total_incremental_visits:+.1f}")
 
     curve = qini_curve(eval_cate, T, Y)
@@ -178,11 +212,18 @@ def render_policy_tab():
     )
     ax.axvline(pct, color="#b5842b", linewidth=1.2)
     ax.set_xlabel("% of customers targeted (top-k by predicted uplift)")
-    ax.set_ylabel("cumulative incremental visits")
+    ax.set_ylabel("Raw Qini gain (treated-count rescaled visits)")
     ax.set_title("Qini curve")
     ax.legend(fontsize=8)
     fig.tight_layout()
     st.pyplot(fig)
+    st.warning(
+        "The Qini curve uses the raw treated-count-rescaled gain convention. The all-targeted "
+        "total above applies the selected-segment visit-rate difference to every customer emailed, "
+        "so the two totals use different denominators. The interval shown above covers the full "
+        "ranking; interactive top-k points are descriptive subgroup explorations without a "
+        "pointwise confidence interval."
+    )
 
     est_cost = n_targeted * DEFAULT_EMAIL_COST_USD
     # a lone literal "$" is safe in Streamlit markdown, but two "$" in one string get parsed as
@@ -200,10 +241,15 @@ def render_policy_tab():
         "the ordering of point estimates, determine whether one policy beats another."
     )
     values = artifact["policy_values"].copy()
+    values["Expected visit rate"] = values["value"].map(format_probability_level)
     values["95% CI"] = values.apply(
-        lambda row: f"[{row['ci_low']:.4f}, {row['ci_high']:.4f}]", axis=1
+        lambda row: (
+            f"[{format_probability_level(row['ci_low'])}, "
+            f"{format_probability_level(row['ci_high'])}]"
+        ),
+        axis=1,
     )
-    st.dataframe(values[["value", "95% CI"]], width="stretch")
+    st.dataframe(values[["Expected visit rate", "95% CI"]], width="stretch")
 
     shares = pd.Series(results["policy"]["recommendation_shares"], name="share")
     st.caption("Learned-policy action shares on the held-out evaluation set")
@@ -211,34 +257,62 @@ def render_policy_tab():
 
     comparisons = artifact["policy_comparisons"].copy()
     comparisons["95% CI"] = comparisons.apply(
-        lambda row: f"[{row['ci_low']:+.4f}, {row['ci_high']:+.4f}]", axis=1
+        lambda row: (
+            f"[{format_probability_difference(row['ci_low'])}, "
+            f"{format_probability_difference(row['ci_high'])}]"
+        ),
+        axis=1,
     )
-    st.dataframe(comparisons[["difference", "95% CI"]], width="stretch")
+    comparisons["Difference"] = comparisons["difference"].map(format_probability_difference)
+    st.dataframe(comparisons[["Difference", "95% CI"]], width="stretch")
     st.info(results["policy"]["conclusion"])
 
     st.divider()
     st.subheader("Reported-spend sensitivity")
     st.warning(
-        "Spend is reported and capped in the source data. The learned policy was trained to "
-        "maximise visits, not profit; this calculation is a margin sensitivity, not a profit "
-        "estimate."
+        "Spend is reported and may be top-coded. The learned policy was trained to maximise "
+        "visits, not contribution; neither margin uncertainty nor unreported spend is included. "
+        "These conditional sensitivities are not profit estimates."
     )
     margin = st.slider("Assumed gross margin", 0, 100, 30) / 100
     email_cost = st.number_input(
         "Cost per email", min_value=0.0, value=DEFAULT_EMAIL_COST_USD, step=0.01
     )
-    spend_values = results["reported_spend_sensitivity"]["values"]
-    spend_by_policy = {row["policy"]: row["value"] for row in spend_values}
-    learned_spend = spend_by_policy["learned (DRPolicyForest)"]
-    no_email_spend = spend_by_policy["email nobody"]
-    contact_rate = results["reported_spend_sensitivity"]["contact_rate"]
-    contribution = incremental_net_value(
-        learned_spend, no_email_spend, contact_rate, margin, email_cost
-    )
-    st.metric("Estimated incremental contribution per customer", f"${contribution:+.4f}")
+    spend = results["reported_spend_sensitivity"]
+    spend_comparisons = {row["comparison"]: row for row in spend["comparisons"]}
+    contact_rates = spend["contact_rates"]
+    learned_policy = "learned (DRPolicyForest)"
+    for baseline, comparison_label, label in (
+        (
+            "email nobody",
+            "learned (DRPolicyForest) - email nobody",
+            "Learned policy versus no email",
+        ),
+        (
+            "email everyone (mens creative)",
+            "learned (DRPolicyForest) - email everyone (mens creative)",
+            "Learned policy versus blanket mens email",
+        ),
+    ):
+        row = spend_comparisons[comparison_label]
+        contact_difference = contact_rates[learned_policy] - contact_rates[baseline]
+        contribution = incremental_net_value_with_interval(
+            row["difference"],
+            row["ci_low"],
+            row["ci_high"],
+            contact_difference,
+            margin,
+            email_cost,
+        )
+        st.metric(f"{label} (per customer)", f"${contribution['value']:+.4f}")
+        st.caption(
+            f"95% paired conditional interval: [${contribution['ci_low']:+.4f}, "
+            f"${contribution['ci_high']:+.4f}]. The interval transforms the stored reported-spend "
+            "comparison under the selected fixed margin and email cost."
+        )
     st.caption(
-        f"Uses stored reported-spend values of ${learned_spend:.4f} for the learned policy and "
-        f"${no_email_spend:.4f} for email nobody, with a {contact_rate:.1%} learned contact rate."
+        "Use the visit results to choose a targeting objective. This sensitivity does not turn "
+        "visit optimisation into an economic deployment recommendation."
     )
 
 

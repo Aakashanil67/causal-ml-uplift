@@ -103,3 +103,11 @@ def test_covariate_matrix_columns_stable_on_a_single_row(df):
     full = build_covariate_matrix(df)
     single = build_covariate_matrix(df.iloc[[0]])
     assert list(single.columns) == list(full.columns)
+
+
+def test_covariate_matrix_rejects_unknown_category_instead_of_encoding_reference(df):
+    invalid = df.iloc[[0]].copy()
+    invalid["zip_code"] = "Typo City"
+
+    with pytest.raises(ValueError, match="zip_code.*unsupported category"):
+        build_covariate_matrix(invalid)

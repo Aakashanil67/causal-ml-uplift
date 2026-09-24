@@ -4,17 +4,18 @@ Hillstrom is randomised, so nothing in the ladder so far has had real confoundin
 every method from the naive diff-in-means onward agrees, because there was nothing to disagree
 about. This module manufactures two observational datasets *from the same real (T, X, Y) rows* by
 retaining customers with a probability that depends on both their arm and their covariates, then
-checks whether each estimator recovers the known experimental benchmark on each one.
+compares selected-sample estimates with the full-RCT experimental reference.
 
 Variant 1 confounds on `recency`/`history`, both included in the estimators' covariate matrix
 (selection on observables). Variant 2 confounds on `newbie`, real in the data but withheld from
 every estimator's covariate matrix in this variant (selection on an unobservable). No outcome
 value is ever fabricated; only which real rows are retained changes.
 
-Caveat stated once here and repeated in the report: this validates each estimator's ability to
-correct for confounding *on variables we ourselves generated and can name*. It says nothing about
-whether DML would recover the truth under a confounder nobody thought to measure at all — which is
-exactly variant 2's point, and exactly why variant 2 is expected to fail everywhere, DML included.
+Caveat: the full-RCT estimate is itself estimated, and selection changes the covariate distribution.
+Under heterogeneous effects the selected-sample ATE may differ from the original-population ATE.
+These examples are selection diagnostics against an experimental reference, not known-bias
+benchmarks. Bias and coverage claims belong to the fully synthetic experiment in `src/simulation.py`,
+where the generating probabilities and sample-average target are known.
 """
 
 import numpy as np
@@ -126,78 +127,60 @@ def run_variant(
 
 
 def write_confounding_report(benchmark: float, v1: dict, v2: dict, out_path) -> None:
-    def pp(x):
-        return f"{x * 100:+.2f}pp"
+    def pp(value: float) -> str:
+        return f"{value * 100:+.2f}pp"
 
     lines = [
         "# Constructed confounding stress test",
         "",
-        "Every method so far agreed because Hillstrom is randomised and there was nothing to",
-        "disagree about. This section manufactures real confounding from the same data and checks",
-        "how each estimator responds. The full-RCT DML estimate on `visit`,",
-        f"**{pp(benchmark)}** (`reports/05_dml_ate.md`), is shown as an experimental reference,",
-        "not the selected sample's known causal truth when effects vary by covariates.",
+        "This section constructs selection using the same real Hillstrom rows. The full-RCT DML",
+        "estimate on `visit`,",
+        f"**{pp(benchmark)}** (`reports/05_dml_ate.md`), is an estimated experimental reference.",
+        "It is not known truth for either selected sample: selection changes the covariate",
+        "distribution, and heterogeneous effects can change the selected-population ATE.",
         "",
-        "**What this validates and what it doesn't.** Both variants below confound on named,",
-        "real covariates from this dataset. Variant 1 gives every estimator access to the",
-        "confounder; variant 2 deliberately withholds it. Passing variant 1 shows DML can correct",
-        "for this constructed selection mechanism when the relevant covariates remain available.",
-        "Variant 2 shows, honestly, that it cannot correct",
-        "for confounding it cannot see, which is a limitation of every method here, DML included,",
-        "not a defect specific to it. Neither variant says anything about whether unobserved",
-        "confounding exists in the real, unconfounded Hillstrom data; the whole point of using an",
-        "RCT for the rest of this project is that it doesn't need to.",
+        "The differences below are selection diagnostics, not numerical bias estimates. A",
+        "common-target comparison would be needed to make a real-data bias claim. Bias and",
+        "coverage are evaluated in the fully synthetic experiment, where the generating",
+        "probabilities and sample-average target are known. LinearDML also uses a linear final",
+        "effect stage; flexible nuisance models do not guarantee recovery under an arbitrary",
+        "response surface.",
         "",
         "## Variant 1: selection on observables (`recency`, `history`)",
         "",
         f"Retained {v1['n']:,} of 64,000 customers. Treated customers were kept preferentially",
         "when recent and high-spending, and control customers preferentially when lapsed and",
-        "low-spending: a plausible stand-in for a marketer targeting the best customers. Both",
-        "confounders stay in every estimator's covariate matrix.",
+        "low-spending. Both variables remain available to each estimator.",
         "",
-        "| estimator | ATE on visit | vs benchmark |",
-        "|---|---|---|",
-        f"| naive diff-in-means | {pp(v1['naive'])} | off by {pp(v1['naive'] - benchmark)} |",
-        f"| OLS, `recency`+`history` as controls | {pp(v1['ols'])} | off by "
-        f"{pp(v1['ols'] - benchmark)} |",
+        "| estimator | selected-sample estimate | difference from full-RCT estimate |",
+        "|---|---:|---:|",
+        f"| naive diff-in-means | {pp(v1['naive'])} | {pp(v1['naive'] - benchmark)} |",
+        f"| OLS with `recency` and `history` | {pp(v1['ols'])} | {pp(v1['ols'] - benchmark)} |",
         f"| LinearDML | {pp(v1['dml']['ate'])} [{pp(v1['dml']['ci_low'])}, "
-        f"{pp(v1['dml']['ci_high'])}] | benchmark "
-        f"{'inside' if v1['dml']['ci_low'] <= benchmark <= v1['dml']['ci_high'] else 'outside'} "
-        "the CI |",
+        f"{pp(v1['dml']['ci_high'])}] | {pp(v1['dml']['ate'] - benchmark)} |",
         "",
-        "The naive estimate overstates the true effect by roughly two-thirds of its own size:",
-        "confounded customers were always more likely to visit, email or not, and the naive",
-        "comparison credits all of that to the email. Both OLS and DML, given the same two",
-        "confounders as controls, land back close to the benchmark. DoWhy's identification step on",
-        "the equivalent confounded graph (`src/confounded.py:identify_confounded`) confirms this is",
-        "not a coincidence: adding `recency → treatment` and `history → treatment` edges to the",
-        "graph in `src/dag.py` changes the backdoor adjustment set from empty to exactly",
-        "`{recency, history}`, which is precisely what both estimators condition on here.",
+        "These differences describe how the estimators move under this selection mechanism. They",
+        "do not show how far an estimator is from a known causal target for the selected rows.",
         "",
-        "## Variant 2: selection on an unobservable (`newbie`, withheld)",
+        "## Variant 2: selection on `newbie`, withheld from the estimator",
         "",
-        f"Retained {v2['n']:,} customers. This time treated customers were kept preferentially",
-        "when `newbie=0` (an established customer) and control customers preferentially when",
-        "`newbie=1` (a new account) — `newbie` has a real, sizeable effect on `visit` on its own",
-        "(`reports/03_regression_baseline.md`: −6.45pp). Every estimator in this variant is fit",
-        "**without `newbie` in its covariate matrix**, standing in for a confounder nobody",
-        "measured.",
+        f"Retained {v2['n']:,} customers. Treated customers were kept preferentially when `newbie=0`,",
+        "and control customers when `newbie=1`. The fitted estimators omit `newbie`.",
+        f"Its regression profile contrast is {pp(v2['newbie_effect'])} when changing the same",
+        "profiles from existing to new account (`reports/03_regression_baseline.md`).",
         "",
-        "| estimator | ATE on visit | vs benchmark |",
-        "|---|---|---|",
-        f"| naive diff-in-means | {pp(v2['naive'])} | off by {pp(v2['naive'] - benchmark)} |",
-        f"| OLS, `newbie` withheld | {pp(v2['ols'])} | off by {pp(v2['ols'] - benchmark)} |",
-        f"| LinearDML, `newbie` withheld | {pp(v2['dml']['ate'])} [{pp(v2['dml']['ci_low'])}, "
-        f"{pp(v2['dml']['ci_high'])}] | benchmark "
-        f"{'inside' if v2['dml']['ci_low'] <= benchmark <= v2['dml']['ci_high'] else 'outside'} "
-        "the CI |",
+        "| estimator | selected-sample estimate | difference from full-RCT estimate |",
+        "|---|---:|---:|",
+        f"| naive diff-in-means | {pp(v2['naive'])} | {pp(v2['naive'] - benchmark)} |",
+        f"| OLS with `newbie` withheld | {pp(v2['ols'])} | {pp(v2['ols'] - benchmark)} |",
+        f"| LinearDML with `newbie` withheld | {pp(v2['dml']['ate'])} "
+        f"[{pp(v2['dml']['ci_low'])}, {pp(v2['dml']['ci_high'])}] | "
+        f"{pp(v2['dml']['ate'] - benchmark)} |",
         "",
-        "Neither OLS nor DML recovers the benchmark here, and DML's confidence interval does not",
-        "contain it. This is the expected result, not a bug: no amount of model flexibility can",
-        "adjust for a variable it never receives. The reason this is worth showing rather than just",
-        "stating is that it forecloses the easy version of the question an interviewer would ask,",
-        "\"doesn't DML fix confounding?\": it fixes confounding on the variables it's given, and no",
-        "method here, or anywhere, fixes what it was never told about.",
+        "The `newbie` variable is omitted from the estimator by construction. This illustrates",
+        "the importance of measured adjustment inputs, but the difference from the original RCT",
+        "estimate is not a bias estimate for this selected population. The synthetic experiment",
+        "provides the known-target test for omitted-confounder bias.",
     ]
     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 

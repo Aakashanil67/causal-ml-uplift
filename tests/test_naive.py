@@ -2,7 +2,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.naive import _standardised_diff, covariate_balance, diff_in_means, naive_estimates
+from src.naive import (
+    _standardised_diff,
+    covariate_balance,
+    diff_in_means,
+    naive_estimates,
+    write_naive_report,
+)
 
 
 @pytest.fixture(scope="module")
@@ -37,6 +43,30 @@ def test_standardised_diff_zero_for_identical_groups():
 def test_standardised_diff_zero_variance_no_divide_by_zero():
     constant = pd.Series([5.0, 5.0, 5.0])
     assert _standardised_diff(constant, constant) == 0.0
+
+
+def test_standardised_diff_flags_separated_constant_groups():
+    treated = pd.Series([1.0, 1.0, 1.0])
+    control = pd.Series([0.0, 0.0, 0.0])
+
+    assert np.isinf(_standardised_diff(treated, control))
+
+
+def test_naive_report_flags_undefined_infinite_balance_values(tmp_path):
+    estimates = pd.DataFrame(
+        [{"treated_mean": 0.5, "control_mean": 0.1, "diff": 0.4, "ci_low": 0.2, "ci_high": 0.6}],
+        index=pd.Index(["visit"], name="outcome"),
+    )
+    balance = pd.DataFrame(
+        [{"treated_mean": 1.0, "control_mean": 0.0, "standardised_diff": np.inf}],
+        index=pd.Index(["separated"], name="covariate"),
+    )
+    path = tmp_path / "naive.md"
+
+    write_naive_report(estimates, balance, path)
+
+    report = path.read_text(encoding="utf-8")
+    assert "undefined (zero within-group variance) ⚠" in report
 
 
 def test_standardised_diff_known_value():

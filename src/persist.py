@@ -10,10 +10,17 @@ surrogate instead — so the real forest ships, not an approximation of it.
 """
 
 import joblib
+import numpy as np
 import pandas as pd
 from econml.dml import CausalForestDML
 
-from src.config import COVARIATE_COLS, MODELS_DIR
+from src.config import (
+    BINARY_COVARIATES,
+    CATEGORICAL_LEVELS,
+    COVARIATE_COLS,
+    MODELS_DIR,
+    NUMERIC_COVARIATES,
+)
 from src.data_loader import build_covariate_matrix
 from src.results import build_provenance, validate_provenance
 
@@ -46,11 +53,32 @@ def predict_cate_for_profile(model: CausalForestDML, profile: dict) -> dict:
     missing = set(COVARIATE_COLS) - set(profile)
     if missing:
         raise ValueError(f"profile missing required fields: {missing}")
+    for column in NUMERIC_COVARIATES:
+        value = profile[column]
+        if isinstance(value, bool) or not isinstance(value, (int, float, np.number)):
+            raise ValueError(f"{column} must be a finite numeric value.")
+        number = float(value)
+        if not np.isfinite(number):
+            raise ValueError(f"{column} must be a finite numeric value.")
+        low, high = (1, 12) if column == "recency" else (29.99, 3345.93)
+        if not low <= number <= high:
+            raise ValueError(f"{column} must be between {low} and {high}.")
+    for column in BINARY_COVARIATES:
+        if profile[column] not in (0, 1, False, True):
+            raise ValueError(f"{column} must be a binary flag equal to 0 or 1.")
+    for column, levels in CATEGORICAL_LEVELS.items():
+        if profile[column] not in levels:
+            raise ValueError(f"{column} has unsupported category {profile[column]!r}.")
     row = pd.DataFrame([profile])[COVARIATE_COLS]
     X = build_covariate_matrix(row).to_numpy()
     effect = float(model.effect(X)[0])
     ci_low, ci_high = model.effect_interval(X)
-    return {"cate": effect, "ci_low": float(ci_low[0]), "ci_high": float(ci_high[0])}
+    return {
+        "cate": effect,
+        "ci_low": float(ci_low[0]),
+        "ci_high": float(ci_high[0]),
+        "extrapolative": not (bool(profile["mens"]) or bool(profile["womens"])),
+    }
 
 
 def main() -> None:

@@ -1,6 +1,34 @@
+import hashlib
+import json
+
 import pytest
 
-from src.render_report import find_chrome, render_pdf
+from src.render_report import find_chrome, pdf_freshness_path, pdf_is_current, render_pdf
+
+
+def test_pdf_freshness_normalizes_markdown_newlines_and_hashes_pdf_as_binary(tmp_path):
+    md_path = tmp_path / "report.md"
+    pdf_path = tmp_path / "report.pdf"
+    pdf_bytes = b"%PDF-1.7\nfixture bytes\n"
+    md_path.write_bytes(b"# Report\r\nSame text\r\n")
+    pdf_path.write_bytes(pdf_bytes)
+    pdf_freshness_path(pdf_path).write_text(
+        json.dumps(
+            {
+                "source_sha256": hashlib.sha256(b"# Report\nSame text\n").hexdigest(),
+                "pdf_sha256": hashlib.sha256(pdf_bytes).hexdigest(),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert pdf_is_current(md_path, pdf_path)
+
+    md_path.write_bytes(b"# Report\nSame text\n")
+    assert pdf_is_current(md_path, pdf_path)
+
+    pdf_path.write_bytes(b"%PDF-1.7\nchanged bytes\n")
+    assert not pdf_is_current(md_path, pdf_path)
 
 
 def test_render_pdf_produces_a_real_pdf(tmp_path):
@@ -26,6 +54,10 @@ def test_render_pdf_produces_a_real_pdf(tmp_path):
         assert f.read(5) == b"%PDF-"
     # the intermediate HTML file should be cleaned up, not left behind
     assert not md_path.with_suffix(".html").exists()
+    assert pdf_is_current(md_path, out_path)
+    assert pdf_freshness_path(out_path).exists()
+    md_path.write_text("# Updated source\n", encoding="utf-8")
+    assert not pdf_is_current(md_path, out_path)
 
 
 def test_render_pdf_raises_clearly_if_chrome_is_missing(tmp_path, monkeypatch):
