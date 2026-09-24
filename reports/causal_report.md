@@ -2,73 +2,109 @@
 
 ## Can causal ML find deployable treatment-effect heterogeneity, or only a reliable average effect?
 
-Hillstrom's 64,000-customer randomised experiment identifies a clear average result: assignment to either email raises the two-week visit rate by 6.01% [5.48%, 6.55%]. The individual-targeting result is weaker. Normalized Qini is 0.0111 [-0.0114, 0.0331], and the learned policy's advantage over blanket mens emailing is +0.0013 [-0.0014, +0.0040]. Neither interval supports personalised deployment. The decision supported by this campaign is blanket mens emailing, while the causal-ML work diagnoses what a better follow-up experiment must change.
+Hillstrom's 64,000-customer randomized experiment estimates an average visit-rate effect of +6.01pp [+5.48pp, +6.55pp], about 60 additional visits per 1,000 customers assigned email. The normalized Qini estimate is 0.0111 [-0.0114, 0.0331]. Learned minus blanket mens policy value is +0.13pp [-0.14pp, +0.40pp]. The evidence supports an average effect. The interval crosses zero, so this analysis does not establish a positive ranking advantage. Held-out evidence does not establish which policy has higher expected visit value. Blanket mens emailing is the simpler action for this experiment; validate any learned policy on another campaign before broader deployment.
 
 ## 1. The causal question and why identification is clean here
 
-The graph this report works from (`reports/01_causal_question.md`, `reports/figures/dag.png`) has exactly one substantive property: nothing points into `treatment`. Seven covariates plausibly cause the outcomes (`recency`, `history`, `mens`, `womens`, `newbie`, `zip_code`, `channel`), but none of them caused which arm a customer landed in, because assignment was randomised. That is not a modelling assumption; it is a design fact about how Hillstrom ran the experiment, and Section 2 checks it against the data rather than taking it on faith. DoWhy's `identify_effect()` confirms the formal consequence: the backdoor adjustment set is empty for all three outcomes (`reports/04_identification.md`), so `E[Y|T=1] − E[Y|T=0]` is already the correct nonparametric estimand, no covariate adjustment required.
-
-![causal graph: no arrows into treatment](figures/dag.png)
+The assumed graph has no causes of treatment assignment other than the randomizer. Under the documented randomized design, the pooled email-versus-control comparison identifies an intention-to-treat effect. The graph states the design assumption; the measured balance table is a descriptive finite-sample check and cannot prove the absence of unmeasured causes. DoWhy derives an empty backdoor adjustment set under this graph.
 
 ## 2. The naive estimate, and the check that it is allowed to be naive
 
-Standardised covariate differences between treated and control, across 11 covariates (numeric, binary, and one row per categorical level), max out at 0.0088 (`reports/02_naive_estimate.md`), an order of magnitude under the usual 0.1 "balanced" threshold. That is the empirical version of Section 1's graph-level claim. On that basis, the naive difference-in-means is a legitimate estimate, not a strawman: +6.09pp on visit (95% CI [5.54, 6.63]), +0.50pp on conversion, +$0.597 on spend.
+Under random assignment, the difference in means estimates the effect of assignment to the historical email mixture. The balance table is descriptive evidence about measured covariates, not proof of the assignment mechanism. The estimated effects are visit +6.09pp [+5.54pp, +6.63pp], conversion +0.50pp [+0.35pp, +0.64pp], and spend $+0.597 [$0.376, $0.817]. The largest defined absolute standardized difference is 0.0088.
 
 ## 3. The methods ladder: naive, regression, and Double ML agree
 
+The treatment effects below are expressed in percentage points for binary outcomes and dollars for spend. Agreement is expected under randomized assignment; it does not establish that DML is superior. The adjusted logit treatment effect is an average discrete prediction change. Continuous covariates use average derivatives, binary covariates use 0-to-1 changes, and categorical covariates use valid profile contrasts. LinearDML allows effect modification through a final effect model, which is linear here. Interactions can also estimate heterogeneity. Randomization does not prevent nuisance-model overfitting, so cross-fitting remains useful.
+
 | method | visit | conversion | spend |
-|---|---|---|---|
-| naive diff-in-means | +6.09pp [5.54, 6.63] | +0.50pp | +$0.597 |
-| logit AME / OLS, covariate-adjusted | +6.49pp [5.87, 7.10] | +0.56pp [0.38, 0.75] | +$0.596 [0.375, 0.816] |
-| LinearDML (LightGBM nuisances) | +6.01pp [5.48, 6.55] | +0.50pp [0.36, 0.64] | +$0.613 [0.389, 0.837] |
-
-All three land within a few hundredths of a percentage point of each other on every outcome (`reports/03_regression_baseline.md`, `reports/05_dml_ate.md`). That agreement is not a coincidence and not a demonstration of DML's power. On a randomised experiment there is nothing for covariate adjustment or partialling-out to correct, so every unbiased method should converge on roughly the same number, and here they do. DML earns its place in the ladder for a different reason: the same partialling-out machinery is what Section 5 reuses to estimate an effect that varies by customer, which none of the simpler methods above can do at all.
-
-Splitting the pooled treatment by creative rather than averaging it away shows the two emails are not interchangeable: mens email lifts visit by +7.47pp (DML, [6.82, 8.12]), womens by +4.49pp ([3.87, 5.12]), a real, non-overlapping gap that motivates Sections 6 and 7.
+|---|---:|---:|---:|
+| naive difference in means | +6.09pp | +0.50pp | $+0.597 |
+| adjusted logit/OLS | +6.07pp | +0.49pp | $+0.596 |
+| LinearDML | +6.01pp | +0.50pp | $+0.613 |
 
 ## 4. Constructed confounding stress test
 
-Every method above agreed because there was nothing to disagree about. `reports/06_confounding_benchmark.md` manufactures real confounding from the same real rows, retaining customers by a probability that depends on both their arm and their covariates and never fabricating an outcome, then checks whether each estimator can see through it, against the actual DML benchmark of +6.01pp.
+The full randomized sample's estimated DML visit effect is +6.01pp [+5.48pp, +6.55pp]. Selected-sample comparisons below are descriptive: selection changes the covariate distribution and can change the target-population effect. They are not known-bias estimates. The fully synthetic benchmark evaluates bias and coverage against known sample-average potential-outcome targets. LinearDML's flexible nuisance functions do not remove the restriction of its linear final effect stage.
 
-**Confound on `recency`/`history`, both observed by every estimator:** naive diff-in-means overstates the effect by two-thirds (+10.03pp), OLS and DML both correct back to +5.93pp and +5.99pp respectively, the latter's CI [4.79, 7.19] comfortably containing the true benchmark. DoWhy's identification on the equivalent confounded graph confirms this is not a coincidence: adding `recency`/`history → treatment` edges changes the backdoor set from empty to exactly `{recency, history}`, precisely what both estimators condition on.
-
-**Confound on `newbie`, withheld from every estimator:** naive +9.56pp, OLS +10.09pp, DML +9.49pp with a CI of [8.72, 10.26], nowhere near the true benchmark. DML does not fix confounding it cannot see. This is the honest version of "does DML work" that this report can actually stand behind: it corrects for what it is given, and no method here, or anywhere, corrects for what it was never told about.
+| selection variant | estimator | estimate | difference from full-RCT reference |
+|---|---|---:|---:|
+| recency/history observed | naive | +10.03pp | +4.02pp |
+| recency/history observed | OLS | +5.93pp | -0.09pp |
+| recency/history observed | LinearDML | +5.99pp | -0.02pp |
+| newbie withheld | naive | +9.56pp | +3.55pp |
+| newbie withheld | OLS | +10.09pp | +4.08pp |
+| newbie withheld | LinearDML | +9.49pp | +3.48pp |
 
 ## 5. Heterogeneity: who the email actually helps
 
-The causal forest estimates profile-level conditional average effects on `visit`. I did not treat its segments as evidence on their own. A post-hoc held-out HC1-robust audit estimates +0.0403 for mens-only, +0.0617 for womens-only and +0.1582 for both-category customers. The womens-only minus mens-only contrast has Holm p=0.113; the joint Wald p-value is 8.55e-07. This is exploratory evidence of segment differences, not a person-level causal effect.
+A held-out HC1-robust interaction audit finds exploratory segment-level differences. These are average effects within observed segments, not individual effects.
+
+| segment | visit effect | 95% CI |
+|---|---:|---:|
+| mens only | +4.03pp | [+2.61pp, +5.44pp] |
+| womens only | +6.17pp | [+4.71pp, +7.64pp] |
+| both | +15.82pp | [+11.98pp, +19.67pp] |
+
+The womens-only minus mens-only contrast has Holm-adjusted p=0.113; the joint Wald p-value is 8.55e-07. These post-hoc checks do not show that one customer-level ranking is reliable.
 
 ## 6. Uplift ranking and targeting economics
 
-The primary split's normalized Qini is 0.0111 [-0.0114, 0.0331]. Five repeated sample splits are all positive in this run, but range from 0.0111 to 0.0360; the primary fixed-model conditional bootstrap interval still includes zero. That is weak ranking evidence. The top-30% pooled-mixture diagnostic estimates +0.0603 visits per emailed customer, but it does not tell a marketer which creative to send. The three-action analysis answers that separate question.
+Normalized Qini is 0.0111 [-0.0114, 0.0331]. Across honest splits it ranges from 0.0111 to 0.0360; repeated splits are sensitivity evidence, not independent replications. The interval crosses zero, so this analysis does not establish a positive ranking advantage.
+The top-30% pooled-email visit difference is +6.03pp [+4.06pp, +7.95pp] per emailed customer. This diagnostic concerns the historical creative mixture and does not select between creatives.
+
+Reported-spend policy sensitivity is learned minus no email: $+0.726 [$+0.238, $+1.255], and learned minus blanket mens: $-0.056 [$-0.157, $+0.022]. Reported spend may be top-coded at $499; no gross margin or uncapped outcome is available, so these are not profit estimates.
 
 ## 7. Three actions, not two: an honest result
 
-Cross-fitted doubly robust evaluation gives the learned policy a visit-rate value of 0.1823, against 0.1810 for blanket mens emailing. The paired difference is +0.0013 [-0.0014, +0.0040]. Personalisation does not earn its operational complexity here. The evidence-supported decision is the simpler one: use the stronger mens creative broadly, then test a new campaign designed to create genuine action-level trade-offs.
+Cross-fitted doubly robust evaluation estimates expected visit rates under three-action policies. Intervals are paired fixed-model conditional evaluation intervals.
+
+| policy | expected visit rate | 95% CI |
+|---|---:|---:|
+| learned (DRPolicyForest) | 18.23% | [17.30%, 19.16%] |
+| email everyone (mens creative) | 18.10% | [17.19%, 19.02%] |
+| email everyone (womens creative) | 15.20% | [14.33%, 16.15%] |
+| purchase-history heuristic | 18.48% | [17.51%, 19.40%] |
+| email nobody | 10.70% | [9.94%, 11.51%] |
+
+Learned minus blanket mens is +0.13pp [-0.14pp, +0.40pp]. Held-out evidence does not establish which policy has higher expected visit value. Blanket mens emailing is the simpler action for this experiment; validate any learned policy on another campaign before broader deployment.
 
 ## 8. Refutation tests, and what they do not prove
 
-DoWhy's own `refute_estimate()` wrapper fails outright on this project's categorical covariates (a real `KeyError`, confirmed before abandoning the approach), so placebo treatment, random common cause, and data-subset refutation were implemented by hand against the actual `LinearDML` pipeline this report uses, not a substitute (`reports/08_refutations.md`). On the real RCT, all three pass cleanly: shuffling treatment kills the effect (+0.0003, CI containing 0), adding pure random noise barely moves the estimate (+0.0605 vs +0.0601), and five refits on 80% subsamples stay tight (std 0.0015).
+Placebo treatment, random common cause, and data-subset refits diagnose responses to specific perturbations. They do not test whether the causal identification assumptions hold and do not certify correctness.
 
-The more useful result comes from running the same three refuters on Section 4's already-known-biased confounded estimate (+0.0949, confirmed wrong). All three "pass" there too: placebo still shows a CI containing zero, random common cause still barely moves the (wrong) number, the subset refits are still stable, just stably wrong. None of these three standard refutation tests can detect omitted-variable bias; they test whether the estimation procedure is well-behaved, not whether the identification assumption holds. The only thing in this project that actually tested the identification assumption was Section 4's comparison against a known experimental benchmark, because that is the one place a ground truth existed to check against. Most real observational studies do not have that luxury.
+### Randomized sample
+
+| check | estimate / summary |
+|---|---:|
+| placebo treatment | +0.0003 [-0.0054, +0.0061] |
+| random common cause | +0.0605 [+0.0551, +0.0658] |
+| data subset | mean +0.0610, SD 0.0015 |
+
+### Selected sample
+
+| check | estimate / summary |
+|---|---:|
+| placebo treatment | +0.0022 [-0.0061, +0.0105] |
+| random common cause | +0.0952 [+0.0875, +0.1030] |
+| data subset | mean +0.0950, SD 0.0015 |
+
+The selected-sample estimate is compared with an estimated full-RCT reference for a different population. That difference is descriptive, not an omitted-confounder bias demonstration. Claims about bias and coverage against known targets are limited to the fully synthetic benchmark.
 
 ## 9. Limitations, stated rather than buried
 
-- **One campaign, one retailer, US, March 2008.** Nothing here says these exact numbers generalise to another retailer, another country, or another decade. What generalises is the method (the identify-estimate-refute-validate loop this report runs), not the +6pp.
-- **`spend` may be top-coded at exactly $499.00** for 12 customers (`reports/data_dictionary.md`). Estimates are therefore effects on the reported capped outcome; the uncapped-spend effect is not identified without a censoring model and is not automatically a lower bound.
-- **The DAG treats `visit`/`conversion`/`spend` as three parallel outcomes**, not the real mediation chain (`treatment → visit → conversion → spend`, which the data supports: conversion is a strict subset of visit). This report estimates the total effect of treatment on each outcome, which is standard and matches what DML/CausalForestDML compute; it does not decompose how much of the spend effect runs through visiting, which would need its own identification argument.
-- **The confounding validation in Section 4 tests selection on named, engineered covariates.** It shows DML corrects for confounding it can see and fails honestly on confounding it cannot. It says nothing about whether an unobserved confounder exists in the real, unconfounded Hillstrom data; the entire reason this project uses a randomised experiment is that it does not need to answer that question.
-- **Reported gross spend is not profit.** Section 6 does not infer break-even without a margin assumption, and possible spend top-coding leaves the uncapped-spend effect unidentified.
-- **The learned three-arm policy's advantage over the simplest baseline is not statistically established** on this eval set (Section 7). A larger eval sample, or a setting with real segment-level harm from the default action, would be needed to see policy learning's value more clearly than this data can show it.
+- The study is one US retailer campaign from March 2008. Its effect sizes do not establish what would happen in another country, retailer, or current campaign.
+- Spend is reported and may be top-coded at $499. The maximum alone does not establish the cap mechanism or motive. The uncapped-spend effect and profitability are unidentified here.
+- The observed order of visit, conversion, and spend is compatible with mediation, but sequence alone does not establish a causal graph. This analysis estimates total effects and does not decompose mediation.
+- The constructed real-data selection examples show estimates under specified mechanisms. They do not establish bias under omitted confounding in an observational target population.
+- Segment contrasts are exploratory. Qini evidence: The interval crosses zero, so this analysis does not establish a positive ranking advantage. Policy evidence: Held-out evidence does not establish which policy has higher expected visit value. Blanket mens emailing is the simpler action for this experiment; validate any learned policy on another campaign before broader deployment.
 
 ## 10. What would and would not transfer to a South African retention campaign
 
-The mechanics transfer directly: a bank or telco running a retention-offer RCT could rerun this exact pipeline (naive check, DoWhy identification, DML ATE, CausalForestDML heterogeneity, Qini-based targeting, a constructed confounding benchmark if a historical observational dataset exists alongside the RCT, and the same three refutation tests with the same honest caveat about what they do not prove). The specific numbers would not transfer: US speciality-retail purchase behaviour in 2008 says nothing about SA retail-bank or telco customers in 2026, and a resend-the-stronger-offer-to-everyone baseline being hard to beat is a property of *this* campaign's effect distribution (positive almost everywhere), not a general law. A SA campaign with genuine segment-level harm (an offer that actively annoys a segment into churning, for instance) is exactly the setting where Section 7's targeting would show a measurable advantage over a blanket policy, rather than the theoretical one it shows here. Finding out which case a real SA campaign is in is itself the deliverable a decision-science team would be hired to produce.
+The estimation and validation workflow can inform a new randomized campaign, but the Hillstrom effect sizes and policy ranking do not transfer automatically. A local campaign should define its outcome, eligible actions, costs, target population, assignment probabilities, and follow-up window; estimate effects under its own design; and validate any learned policy on held-out or later campaign data. Observational use would additionally require estimated propensities, overlap checks, suitable adjusted estimators, and explicit assumptions. The current benchmark does not establish those assumptions for another dataset.
 
 ## Closing
 
-Using Double Machine Learning to estimate heterogeneous treatment effects, and validating that estimation against a constructed benchmark before trusting it on a question without one, is the general version of what Section 4 does with `recency`/`history`/`newbie`. That is the shape of a thesis-length question worth asking about a real emerging-market intervention: not "does the policy work on average" but "for whom does it work, how would we know if our method could tell the difference, and what happens to the recommended policy once the default action itself is worth being smarter than."
-
+The project estimates an average effect from a randomized experiment, examines exploratory treatment-effect variation, and evaluates a learned action policy. The average effect is supported by the design. The interval crosses zero, so this analysis does not establish a positive ranking advantage. Held-out evidence does not establish which policy has higher expected visit value. Blanket mens emailing is the simpler action for this experiment; validate any learned policy on another campaign before broader deployment. The synthetic benchmark checks estimator behavior against known generated targets, while the selected-sample examples and refutation diagnostics remain limited to descriptive stress tests.
 
 ## References
 
