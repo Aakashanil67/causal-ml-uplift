@@ -52,15 +52,13 @@ as "bought while there." `src/data_loader.load_hillstrom()` asserts this on ever
 downstream design choices depend on it: treating `visit` as the outcome with enough events for
 heterogeneity work, and treating `conversion`/`spend` as the same underlying rare event.
 
-**`spend` may be top-coded at exactly $499.00.** Twelve customers show `spend == 499.00` to the
-cent, and no customer shows anything between $482.31 (the next-highest value) and $499.00. That is
-a gap, not a coincidence. Those twelve span very different purchase histories ($29.99 to $1,515.82), so
-this is not twelve customers independently buying the same $499 item; it reads as a hard cap
-applied when MineThatData published the file, most likely to suppress outliers or protect
-high-value customers from re-identification. Whatever the reason, every spend-based estimate in
-this project (the OLS and DML results on observed `spend`) estimates the effect on the reported,
-capped outcome. The uncapped-spend effect is not identified without an explicit model of the cap,
-so it should not be called a lower bound.
+**`spend` is reported and possibly top-coded.** Twelve customers show `spend == 499.00` to the
+cent, with a gap below to the next-highest value ($482.31). This pattern is consistent with
+top-coding, but the observed maximum does not establish a cap or its mechanism. Different purchase
+histories do not rule out customers buying the same priced product, and the file alone does not
+establish a privacy or outlier-suppression motive. Spend-based estimates describe the reported
+outcome. The uncapped-spend effect is not identified without additional data or a justified
+censoring model.
 
 ## Statistical power, and why heterogeneity work targets `visit`
 
