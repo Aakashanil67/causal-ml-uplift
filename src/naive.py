@@ -45,7 +45,8 @@ def _standardised_diff(treated: pd.Series, control: pd.Series) -> float:
     plausibly differs between arms even before treatment could have had any effect."""
     pooled_sd = np.sqrt((treated.var(ddof=1) + control.var(ddof=1)) / 2)
     if pooled_sd == 0:
-        return 0.0
+        difference = treated.mean() - control.mean()
+        return 0.0 if difference == 0 else float(np.copysign(np.inf, difference))
     return (treated.mean() - control.mean()) / pooled_sd
 
 
@@ -82,10 +83,10 @@ def write_naive_report(estimates: pd.DataFrame, balance: pd.DataFrame, out_path)
     lines = [
         "# Naive estimate: difference in means",
         "",
-        "Treated = received either email (Mens or Womens), control = No E-Mail. On an RCT this",
-        "comparison is unbiased by design, so unlike the usual textbook framing, this is a real",
-        "estimate here, not just a demonstration of what goes wrong. Whether the design assumption",
-        "actually holds in this file is checked below, not just asserted.",
+        "Treated = received either email (Mens or Womens), control = No E-Mail. Under randomized",
+        "assignment, the difference in means estimates the average effect of assignment to the",
+        "email mixture. The balance table is a descriptive check on this file, not proof that the",
+        "randomization worked or that unmeasured causes are absent.",
         "",
         "## Outcome differences",
         "",
@@ -93,45 +94,60 @@ def write_naive_report(estimates: pd.DataFrame, balance: pd.DataFrame, out_path)
         "|---|---|---|---|---|",
     ]
     for outcome, row in estimates.iterrows():
-        lines.append(
-            f"| {outcome} | {row['treated_mean']:.5f} | {row['control_mean']:.5f} | "
-            f"{row['diff']:+.5f} | [{row['ci_low']:.5f}, {row['ci_high']:.5f}] |"
-        )
+        if outcome in ("visit", "conversion"):
+            treated_mean, control_mean = f"{row['treated_mean']:.2%}", f"{row['control_mean']:.2%}"
+            difference = f"{row['diff'] * 100:+.2f}pp"
+            interval = f"[{row['ci_low'] * 100:+.2f}pp, {row['ci_high'] * 100:+.2f}pp]"
+        else:
+            treated_mean, control_mean = (
+                f"${row['treated_mean']:.3f}",
+                f"${row['control_mean']:.3f}",
+            )
+            difference = f"${row['diff']:+.3f}"
+            interval = f"[${row['ci_low']:.3f}, ${row['ci_high']:.3f}]"
+        lines.append(f"| {outcome} | {treated_mean} | {control_mean} | {difference} | {interval} |")
     lines += [
         "",
         "## Covariate balance",
         "",
-        "Standardised difference = (treated mean − control mean) / pooled SD. Values inside ±0.1",
-        "are the usual threshold for calling a covariate balanced (Austin, 2009); nothing here is a",
-        "real pre-treatment difference if the randomisation worked as intended.",
+        "Standardised difference = (treated mean − control mean) / pooled SD. Values near zero",
+        "are consistent with balance on that measured covariate. Balance cannot test for",
+        "unmeasured differences or certify that randomization worked.",
         "",
         "| covariate | treated mean | control mean | standardised diff |",
         "|---|---|---|---|",
     ]
-    max_abs_sdiff = balance["standardised_diff"].abs().max()
+    defined_sdiff = balance["standardised_diff"][
+        np.isfinite(balance["standardised_diff"].to_numpy(dtype=float))
+    ]
+    max_abs_sdiff = defined_sdiff.abs().max() if len(defined_sdiff) else np.nan
     for cov, row in balance.iterrows():
-        flag = " ⚠" if abs(row["standardised_diff"]) >= 0.1 else ""
+        value = row["standardised_diff"]
+        flag = " ⚠" if not np.isfinite(value) or abs(value) >= 0.1 else ""
+        rendered_value = (
+            f"{value:+.4f}" if np.isfinite(value) else "undefined (zero within-group variance)"
+        )
         lines.append(
             f"| {cov} | {row['treated_mean']:.4f} | {row['control_mean']:.4f} | "
-            f"{row['standardised_diff']:+.4f}{flag} |"
+            f"{rendered_value}{flag} |"
         )
-    n_flagged = (balance["standardised_diff"].abs() >= 0.1).sum()
+    n_flagged = (defined_sdiff.abs() >= 0.1).sum()
     lines += [
         "",
-        f"Largest standardised difference: {max_abs_sdiff:.4f}. {n_flagged} of {len(balance)}",
+        f"Largest defined absolute standardised difference: {max_abs_sdiff:.4f}. {n_flagged} of {len(defined_sdiff)} defined",
         "covariates (across numeric, binary and one row per categorical level) exceed the 0.1",
-        "threshold. This is the sanity check the randomisation claim in",
-        "`reports/01_causal_question.md` rests on: it is a testable statement about this file, not",
-        "an assumption. `reports/06_confounding_benchmark.md` shows what this table looks like when",
-        "that assumption is deliberately violated.",
+        "threshold. This is a descriptive balance check on measured covariates, not a test of the",
+        "assignment mechanism. `reports/06_confounding_benchmark.md` shows estimates under",
+        "constructed selection mechanisms; the full-RCT estimate is only a reference for those",
+        "changed populations.",
         "",
         "**Why this comparison would be biased without randomisation.** If treatment had been",
         "chosen by a marketer rather than a coin flip, a nonzero standardised difference on",
         "`history` or `recency` above would mean the treated and control groups differed in ways",
         "that independently predict the outcome, and the diff-in-means table above would then be",
         "mixing the true effect of the email with the effect of already being a different kind of",
-        "customer. That confound is exactly what `src/confounded.py` reconstructs on purpose,",
-        "using this same dataset, to make the size of that bias visible.",
+        "customer. `src/confounded.py` constructs specified selection mechanisms on the same rows;",
+        "differences from the full-RCT estimate are descriptive because selection changes the target population.",
     ]
     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 

@@ -4,15 +4,15 @@
 Double ML's trick is partialling out: instead of controlling for confounders by putting them in a
 single linear regression alongside treatment (the OLS approach in `src/regression_baseline.py`),
 DML first predicts the outcome from covariates alone and the treatment from covariates alone,
-*using flexible ML models that can pick up nonlinearities and interactions a linear control can
-miss*, then estimates the treatment effect from what's left over in both — the parts of Y and T
+*using flexible ML models for nuisance functions*, then estimates the treatment effect from what's left over in both — the parts of Y and T
 that the covariates couldn't explain. **Cross-fitting** (`cv=3` below) is what keeps this valid:
 fitting the nuisance models and the effect model on the same data would let the nuisance models
 overfit and leak information into the effect estimate, so each fold's nuisance predictions come
 from models trained on the *other* folds. On a randomised experiment, where OLS already had nothing
-to partial out, DML shouldn't move the answer much; the value here is in `src/cate.py`, where the
-same partialling-out plumbing is reused to estimate effects that vary by customer rather than one
-number for everyone.
+to partial out, DML shouldn't move the answer much. For heterogeneity, this project compares a
+held-out regression interaction audit with `src/cate.py`'s forest and policy ranking. `LinearDML`
+uses a linear final effect stage, so flexible nuisance models alone do not guarantee recovery under
+an arbitrary nonlinear treatment-effect surface.
 """
 
 import pandas as pd
@@ -77,15 +77,16 @@ def write_dml_report(
         "regressions, 3-fold cross-fitting. See `src/dml_ate.py`'s docstring for what partialling",
         "out and cross-fitting actually do; the short version is that on a randomised experiment",
         "there's nothing for DML to correct for, so the value of running it here is establishing",
-        "that the machinery agrees with simpler methods before `src/cate.py` reuses the same",
-        "machinery on a question OLS cannot answer at all: how the effect varies by customer.",
+        "that the machinery agrees with simpler methods. Effect heterogeneity can also be modeled",
+        "with interactions or flexible final effect models; the interaction audit and causal forest",
+        "provide complementary exploratory evidence.",
         "",
         "## Pooled treatment (any email vs none), vs the regression baseline",
         "",
         "`visit`/`conversion` in percentage points, `spend` in dollars, matching",
         "`reports/03_regression_baseline.md`'s units so the two reports read side by side.",
         "",
-        "| outcome | DML ATE | DML 95% CI | regression AME/coef |",
+        "| outcome | DML ATE | DML 95% CI | regression discrete change / coefficient |",
         "|---|---|---|---|",
     ]
     for outcome, row in pooled.iterrows():
@@ -129,11 +130,11 @@ def write_dml_report(
     lines += [
         "",
         f"On `visit`, the mens email lifts the visit rate by {mens_visit * 100:.2f} percentage",
-        f"points and the womens email by {womens_visit * 100:.2f}, a real gap between two",
-        "creatives that the pooled any-email number above averages away. `src/policy.py` treats",
-        "this as what it is: a three-action decision (no email, mens email, womens email) rather",
-        "than a binary send/don't-send call, and asks whether targeting each customer with the",
-        "better-matched creative beats the obvious `mens`/`womens` purchase-history heuristic.",
+        f"points and the womens email by {womens_visit * 100:.2f}, a difference between two",
+        "creative-specific estimates that the pooled any-email number averages away. This",
+        "difference alone does not establish customer-level personalization value. `src/policy.py`",
+        "treats the decision as three actions (no email, mens email, womens email) and evaluates",
+        "whether learned targeting improves on blanket and purchase-history policies.",
     ]
     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -150,9 +151,9 @@ def main() -> None:
     print(pooled)
     print(per_arm)
 
-    visit_ame = average_marginal_effects(fit_logit(df, "visit")).loc[TREATMENT_COL, "dy/dx"]
-    conversion_ame = average_marginal_effects(fit_logit(df, "conversion")).loc[
-        TREATMENT_COL, "dy/dx"
+    visit_ame = average_marginal_effects(fit_logit(df, "visit"), df).loc[TREATMENT_COL, "effect"]
+    conversion_ame = average_marginal_effects(fit_logit(df, "conversion"), df).loc[
+        TREATMENT_COL, "effect"
     ]
     spend_coef = fit_ols(df, "spend").params[TREATMENT_COL]
     regression_estimates = {"visit": visit_ame, "conversion": conversion_ame, "spend": spend_coef}

@@ -50,12 +50,30 @@ def test_missing_profile_field_raises():
         predict_cate_for_profile(object(), incomplete)
 
 
-def test_predict_ignores_extra_profile_keys(small_model):
-    # a profile dict from a UI form might carry extra fields (e.g. a customer id); prediction
-    # should use only the known covariates, not choke on the rest.
-    extra = {**VALID_PROFILE, "customer_id": 12345}
-    result = predict_cate_for_profile(small_model, extra)
-    assert np.isfinite(result["cate"])
+def test_predict_rejects_unknown_categories_before_model_inference():
+    invalid = {**VALID_PROFILE, "zip_code": "Typo City"}
+
+    with pytest.raises(ValueError, match="zip_code.*unsupported category"):
+        predict_cate_for_profile(object(), invalid)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [("mens", 2), ("newbie", -1), ("recency", 13), ("history", 5000), ("history", float("nan"))],
+)
+def test_predict_rejects_invalid_profile_values_before_model_inference(field, value):
+    invalid = {**VALID_PROFILE, field: value}
+
+    with pytest.raises(ValueError, match=field):
+        predict_cate_for_profile(object(), invalid)
+
+
+def test_neither_category_prediction_is_explicitly_marked_extrapolative(small_model):
+    profile = {**VALID_PROFILE, "mens": 0, "womens": 0}
+
+    result = predict_cate_for_profile(small_model, profile)
+
+    assert result["extrapolative"] is True
 
 
 def test_committed_model_artifact_is_under_the_surrogate_threshold():

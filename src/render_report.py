@@ -7,6 +7,8 @@ committing to the approach, so the path here is markdown -> styled HTML -> Chrom
 PDF library.
 """
 
+import hashlib
+import json
 import shutil
 import subprocess
 from pathlib import Path
@@ -18,6 +20,7 @@ from src.config import REPORTS_DIR
 CHROME_CANDIDATES = [
     r"C:\Program Files\Google\Chrome\Application\chrome.exe",
     r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
 ]
 
 CSS = """
@@ -75,7 +78,55 @@ def render_pdf(
         timeout=60,
     )
     html_path.unlink()
+    sidecar = pdf_freshness_path(out_path)
+    sidecar.write_text(
+        json.dumps(
+            {
+                "source_sha256": _markdown_sha256(md_path),
+                "pdf_sha256": _sha256(out_path),
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     return out_path
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _markdown_sha256(path: Path) -> str:
+    text = path.read_bytes().decode("utf-8")
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def pdf_freshness_path(pdf_path: Path) -> Path:
+    return pdf_path.with_suffix(pdf_path.suffix + ".json")
+
+
+def pdf_is_current(
+    md_path: Path = REPORTS_DIR / "causal_report.md", pdf_path: Path | None = None
+) -> bool:
+    pdf_path = pdf_path or md_path.with_suffix(".pdf")
+    sidecar = pdf_freshness_path(pdf_path)
+    if not md_path.exists() or not pdf_path.exists() or not sidecar.exists():
+        return False
+    try:
+        metadata = json.loads(sidecar.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return metadata == {
+        "source_sha256": _markdown_sha256(md_path),
+        "pdf_sha256": _sha256(pdf_path),
+    }
 
 
 def main() -> None:

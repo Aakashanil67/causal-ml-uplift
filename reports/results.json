@@ -1,4 +1,62 @@
 {
+  "confounding": {
+    "experimental_reference": {
+      "ate": 0.06012814761308752,
+      "ci_high": 0.06550372157211637,
+      "ci_low": 0.05475257365405866
+    },
+    "variants": {
+      "observable": {
+        "dml": {
+          "ate": 0.05993331881486157,
+          "ci_high": 0.07192230485775167,
+          "ci_low": 0.04794433277197148
+        },
+        "n": 31592,
+        "naive": 0.10029009027449032,
+        "ols": 0.059262993550388623
+      },
+      "unmeasured": {
+        "dml": {
+          "ate": 0.09490164194835683,
+          "ci_high": 0.1026193306302329,
+          "ci_low": 0.08718395326648076
+        },
+        "n": 31980,
+        "naive": 0.09564382851312245,
+        "newbie_effect": -0.06704194410403151,
+        "ols": 0.1009278854448439
+      }
+    }
+  },
+  "figures": {
+    "files": [
+      {
+        "path": "cate_by_history.png",
+        "sha256": "db9b57a4c8cc38ad5d0ee20ec389ae16b6aa0841978d6e20ecb3e04ee30b2112"
+      },
+      {
+        "path": "cate_by_purchase_history.png",
+        "sha256": "04790074bafa136f6afb14e9a33300c2394966bfc1b8cf3c5a44884c3f381ddf"
+      },
+      {
+        "path": "cate_by_recency.png",
+        "sha256": "cc1bf22784cef91ad160fd6b43645fe1cfb368400262674304d4ccf686c31d1e"
+      },
+      {
+        "path": "cate_distribution.png",
+        "sha256": "4d68fa3e8751fe5cf1d2abf140b2f1933032fe8b5b96a17b3653e80928653fec"
+      },
+      {
+        "path": "dag.png",
+        "sha256": "6231196286f35c1cad91b1800745333ab642471b47f08bf3f231af42c140d8e9"
+      },
+      {
+        "path": "qini_curve.png",
+        "sha256": "5c9dadb0d5c1176a4f31adcf78413a9bc124820337da9c3902918c5fc43b63d1"
+      }
+    ]
+  },
   "headline": {
     "deduplicated_visit_sensitivity": {
       "deduplicated_rows": 57438,
@@ -67,6 +125,28 @@
         "ate": 0.6130960041641669,
         "ci_high": 0.8371100780190088,
         "ci_low": 0.38908193030932486,
+        "outcome": "spend"
+      }
+    ]
+  },
+  "identification": {
+    "outcomes": [
+      {
+        "backdoor_variables": [],
+        "estimand": "{'estimand': Derivative(Expectation(visit), [treatment]), 'assumptions': {'Unconfoundedness': 'If U→{treatment} and U→visit then P(visit|treatment,,U) = P(visit|treatment,)'}}",
+        "estimand_type": "EstimandType.NONPARAMETRIC_ATE",
+        "outcome": "visit"
+      },
+      {
+        "backdoor_variables": [],
+        "estimand": "{'estimand': Derivative(Expectation(conversion), [treatment]), 'assumptions': {'Unconfoundedness': 'If U→{treatment} and U→conversion then P(conversion|treatment,,U) = P(conversion|treatment,)'}}",
+        "estimand_type": "EstimandType.NONPARAMETRIC_ATE",
+        "outcome": "conversion"
+      },
+      {
+        "backdoor_variables": [],
+        "estimand": "{'estimand': Derivative(Expectation(spend), [treatment]), 'assumptions': {'Unconfoundedness': 'If U→{treatment} and U→spend then P(spend|treatment,,U) = P(spend|treatment,)'}}",
+        "estimand_type": "EstimandType.NONPARAMETRIC_ATE",
         "outcome": "spend"
       }
     ]
@@ -148,8 +228,8 @@
       "zip_code",
       "channel"
     ],
-    "git_dirty": false,
-    "git_sha": "3edc70a838a3",
+    "git_dirty": true,
+    "git_sha": "4d279d931693",
     "packages": {
       "econml": "0.16.0",
       "lightgbm": "4.7.0",
@@ -158,7 +238,112 @@
       "scikit-learn": "1.5.2"
     },
     "random_seed": 42,
-    "source_sha256": "9fe799b213e99b752222ce843a1343e8faed52977b56596b6aca14cafe86b7ba"
+    "source_sha256": "54610a253cb1cdf71c4fd44776a459f5f2dd3b92b31305286f2b6ef704edd536"
+  },
+  "naive": {
+    "balance": [
+      {
+        "control_mean": 5.749694921618324,
+        "covariate": "recency",
+        "standardised_diff": 0.006004340077750869,
+        "treated_mean": 5.770740619290767
+      },
+      {
+        "control_mean": 240.88265324321785,
+        "covariate": "history",
+        "standardised_diff": 0.0070634545705258595,
+        "treated_mean": 242.68600178010956
+      },
+      {
+        "control_mean": 0.5532244438186427,
+        "covariate": "mens",
+        "standardised_diff": -0.006610559041797893,
+        "treated_mean": 0.5499367592635968
+      },
+      {
+        "control_mean": 0.5476391626771802,
+        "covariate": "womens",
+        "standardised_diff": 0.00626509090065978,
+        "treated_mean": 0.5507565465873425
+      },
+      {
+        "control_mean": 0.5019712756969867,
+        "covariate": "newbie",
+        "standardised_diff": 0.0008356308969718988,
+        "treated_mean": 0.5023890944863447
+      },
+      {
+        "control_mean": 0.14732939078193935,
+        "covariate": "zip_code=Rural",
+        "standardised_diff": 0.008811238997617949,
+        "treated_mean": 0.15046610764978685
+      },
+      {
+        "control_mean": 0.4517506805594668,
+        "covariate": "zip_code=Surburban",
+        "standardised_diff": -0.006404781560239178,
+        "treated_mean": 0.44856420105869677
+      },
+      {
+        "control_mean": 0.4009199286585938,
+        "covariate": "zip_code=Urban",
+        "standardised_diff": 0.0001015359873930745,
+        "treated_mean": 0.4009696912915164
+      },
+      {
+        "control_mean": 0.12231296348446447,
+        "covariate": "channel=Multichannel",
+        "standardised_diff": -0.004733100092978113,
+        "treated_mean": 0.12076638403522744
+      },
+      {
+        "control_mean": 0.4377640101379893,
+        "covariate": "channel=Phone",
+        "standardised_diff": 0.00019372228355604056,
+        "treated_mean": 0.43786012086007403
+      },
+      {
+        "control_mean": 0.4399230263775462,
+        "covariate": "channel=Web",
+        "standardised_diff": 0.0029215455929629186,
+        "treated_mean": 0.44137349510469853
+      }
+    ],
+    "estimates": [
+      {
+        "ci_high": 0.06632544104088284,
+        "ci_low": 0.055438473481086444,
+        "control_mean": 0.10616727682343002,
+        "diff": 0.06088195726098464,
+        "n_control": 21306,
+        "n_treated": 42694,
+        "outcome": "visit",
+        "se": 0.0027772876428052012,
+        "treated_mean": 0.16704923408441466
+      },
+      {
+        "ci_high": 0.006360766693897733,
+        "ci_low": 0.0035483756166392027,
+        "control_mean": 0.005726086548390125,
+        "diff": 0.004954571155268468,
+        "n_control": 21306,
+        "n_treated": 42694,
+        "outcome": "conversion",
+        "se": 0.0007174467033822783,
+        "treated_mean": 0.010680657703658593
+      },
+      {
+        "ci_high": 0.8174062357623821,
+        "ci_low": 0.3761858976934139,
+        "control_mean": 0.6527893551112363,
+        "diff": 0.596796066727898,
+        "n_control": 21306,
+        "n_treated": 42694,
+        "outcome": "spend",
+        "se": 0.11255620869106332,
+        "treated_mean": 1.2495854218391342
+      }
+    ]
   },
   "policy": {
     "comparisons": [
@@ -187,7 +372,7 @@
         "difference": 0.07528443759872819
       }
     ],
-    "conclusion": "Held-out evidence does not establish that the learned policy beats blanket mens emailing. Blanket mens is the simpler evidence-supported action; personalised policy deployment needs a new experiment or stronger cross-campaign evidence.",
+    "conclusion": "Held-out evidence does not establish which policy has higher expected visit value. Blanket mens emailing is the simpler action for this experiment; validate any learned policy on another campaign before broader deployment.",
     "empirical_propensities": {
       "Mens E-Mail": 0.332921875,
       "No E-Mail": 0.33290625,
@@ -331,9 +516,9 @@
   },
   "ranking": {
     "cate_summary": {
-      "max": 0.12915934475560067,
+      "max": 0.12915934475560065,
       "mean": 0.06031053776029973,
-      "min": -0.007257459259963842,
+      "min": -0.007257459259963843,
       "std": 0.023000337969603015
     },
     "deciles": [
@@ -532,6 +717,242 @@
       }
     ]
   },
+  "refutations": {
+    "rct": {
+      "placebo": {
+        "ate": 0.00033782280594130284,
+        "ci_high": 0.0060782178504742365,
+        "ci_low": -0.005402572238591631
+      },
+      "random_cause": {
+        "ate": 0.06045993130936639,
+        "ci_high": 0.065846718317015,
+        "ci_low": 0.0550731443017178
+      },
+      "reference_estimate": 0.06012814761308752,
+      "subset": [
+        0.06059676231001556,
+        0.05843654242231455,
+        0.06182091446527226,
+        0.06173569847008025,
+        0.0626569523561958
+      ]
+    },
+    "selected_sample": {
+      "placebo": {
+        "ate": 0.0021814551412555,
+        "ci_high": 0.0104559276539727,
+        "ci_low": -0.006093017371461705
+      },
+      "random_cause": {
+        "ate": 0.09522717056185744,
+        "ci_high": 0.10297070661186813,
+        "ci_low": 0.08748363451184676
+      },
+      "reference_estimate": 0.09490164194835683,
+      "subset": [
+        0.09439102304020905,
+        0.09763350458014468,
+        0.09560291195486835,
+        0.09462450782768603,
+        0.09298253129287161
+      ]
+    }
+  },
+  "regression": {
+    "estimates": [
+      {
+        "ci_high": 0.06611620831784802,
+        "ci_low": 0.05537124944505687,
+        "contrast": "treatment",
+        "effect": 0.06074372888145245,
+        "kind": "average 0-to-1 change",
+        "outcome": "visit"
+      },
+      {
+        "ci_high": 0.006350688958985688,
+        "ci_low": 0.003539627058246855,
+        "contrast": "treatment",
+        "effect": 0.004945158008616272,
+        "kind": "average 0-to-1 change",
+        "outcome": "conversion"
+      },
+      {
+        "ci_high": 0.816256443062803,
+        "ci_low": 0.3752913566342391,
+        "contrast": "treatment",
+        "effect": 0.595773899848521,
+        "kind": "OLS coefficient",
+        "outcome": "spend"
+      }
+    ],
+    "logit_contrasts": {
+      "conversion": [
+        {
+          "ci_high": -0.0002944027688802234,
+          "ci_low": -0.0007636256154422351,
+          "contrast": "recency",
+          "effect": -0.0005290141921612293,
+          "kind": "average derivative",
+          "se": 0.00011970190530621523
+        },
+        {
+          "ci_high": 9.105136949604758e-06,
+          "ci_low": 3.8585183907850975e-06,
+          "contrast": "history",
+          "effect": 6.481827670194928e-06,
+          "kind": "average derivative",
+          "se": 1.3384476960302126e-06
+        },
+        {
+          "ci_high": 0.006350688958985688,
+          "ci_low": 0.003539627058246855,
+          "contrast": "treatment",
+          "effect": 0.004945158008616272,
+          "kind": "average 0-to-1 change",
+          "se": 0.0007171076277394983
+        },
+        {
+          "ci_high": 0.005430547256767482,
+          "ci_low": 0.0010346654425094975,
+          "contrast": "mens",
+          "effect": 0.00323260634963849,
+          "kind": "average 0-to-1 change",
+          "se": 0.001121398422004588
+        },
+        {
+          "ci_high": 0.006530177951551738,
+          "ci_low": 0.0021134590445961205,
+          "contrast": "womens",
+          "effect": 0.004321818498073929,
+          "kind": "average 0-to-1 change",
+          "se": 0.001126714006876433
+        },
+        {
+          "ci_high": -0.0022606068011946003,
+          "ci_low": -0.005481282499410235,
+          "contrast": "newbie",
+          "effect": -0.0038709446503024177,
+          "kind": "average 0-to-1 change",
+          "se": 0.0008216009434223559
+        },
+        {
+          "ci_high": -0.0004809369365082524,
+          "ci_low": -0.005183408211500147,
+          "contrast": "zip_code=Surburban vs Rural",
+          "effect": -0.0028321725740041996,
+          "kind": "category profile contrast",
+          "se": 0.0011996100191305854
+        },
+        {
+          "ci_high": 0.0002207443792400076,
+          "ci_low": -0.004574948913027381,
+          "contrast": "zip_code=Urban vs Rural",
+          "effect": -0.0021771022668936866,
+          "kind": "category profile contrast",
+          "se": 0.0012233911459865786
+        },
+        {
+          "ci_high": 0.0008497652444839439,
+          "ci_low": -0.0038889492120414756,
+          "contrast": "channel=Phone vs Multichannel",
+          "effect": -0.001519591983778766,
+          "kind": "category profile contrast",
+          "se": 0.0012088557287054642
+        },
+        {
+          "ci_high": 0.0024636042262364466,
+          "ci_low": -0.0022965976705778277,
+          "contrast": "channel=Web vs Multichannel",
+          "effect": 8.350327782930956e-05,
+          "kind": "category profile contrast",
+          "se": 0.00121433721857507
+        }
+      ],
+      "visit": [
+        {
+          "ci_high": -0.005607703453274356,
+          "ci_low": -0.007248113685604943,
+          "contrast": "recency",
+          "effect": -0.0064279085694396495,
+          "kind": "average derivative",
+          "se": 0.000418479687705982
+        },
+        {
+          "ci_high": 6.879627083275729e-05,
+          "ci_low": 4.5482227105316665e-05,
+          "contrast": "history",
+          "effect": 5.713924896903698e-05,
+          "kind": "average derivative",
+          "se": 5.947569422535013e-06
+        },
+        {
+          "ci_high": 0.06611620831784802,
+          "ci_low": 0.05537124944505687,
+          "contrast": "treatment",
+          "effect": 0.06074372888145245,
+          "kind": "average 0-to-1 change",
+          "se": 0.0027410609369365193
+        },
+        {
+          "ci_high": 0.07728545952680929,
+          "ci_low": 0.0600100423187587,
+          "contrast": "mens",
+          "effect": 0.068647750922784,
+          "kind": "average 0-to-1 change",
+          "se": 0.004406994185727193
+        },
+        {
+          "ci_high": 0.09516258831389376,
+          "ci_low": 0.07784829506867755,
+          "contrast": "womens",
+          "effect": 0.08650544169128566,
+          "kind": "average 0-to-1 change",
+          "se": 0.004416911542146996
+        },
+        {
+          "ci_high": -0.061403360005057576,
+          "ci_low": -0.07268052820300545,
+          "contrast": "newbie",
+          "effect": -0.06704194410403151,
+          "kind": "average 0-to-1 change",
+          "se": 0.002876828621925478
+        },
+        {
+          "ci_high": -0.03833743672597066,
+          "ci_low": -0.05566371690144081,
+          "contrast": "zip_code=Surburban vs Rural",
+          "effect": -0.04700057681370574,
+          "kind": "category profile contrast",
+          "se": 0.004419969432517897
+        },
+        {
+          "ci_high": -0.03997777369519616,
+          "ci_low": -0.05749657838082106,
+          "contrast": "zip_code=Urban vs Rural",
+          "effect": -0.04873717603800861,
+          "kind": "category profile contrast",
+          "se": 0.004469082827965537
+        },
+        {
+          "ci_high": -0.002727873184574507,
+          "ci_low": -0.020138449392323933,
+          "contrast": "channel=Phone vs Multichannel",
+          "effect": -0.01143316128844922,
+          "kind": "category profile contrast",
+          "se": 0.0044414735223850576
+        },
+        {
+          "ci_high": 0.029622417613253398,
+          "ci_low": 0.01189472636753929,
+          "contrast": "channel=Web vs Multichannel",
+          "effect": 0.020758571990396345,
+          "kind": "category profile contrast",
+          "se": 0.004522370215743395
+        }
+      ]
+    }
+  },
   "reported_spend_sensitivity": {
     "analysis": "evaluation of a visit-optimised policy; reported spend is not profit",
     "break_even_gross_margin": 0.13771820352694003,
@@ -562,6 +983,13 @@
       }
     ],
     "contact_rate": 1.0,
+    "contact_rates": {
+      "email everyone (mens creative)": 1.0,
+      "email everyone (womens creative)": 1.0,
+      "email nobody": 0.0,
+      "learned (DRPolicyForest)": 1.0,
+      "purchase-history heuristic": 1.0
+    },
     "email_cost_usd": 0.1,
     "margin_sensitivity": [
       {
@@ -610,24 +1038,217 @@
       }
     ]
   },
-  "schema_version": 2,
+  "schema_version": 3,
   "simulation": {
-    "analysis": "semi-synthetic Monte Carlo stress test with known data-generating effects",
+    "analysis": "fully synthetic Monte Carlo; target is the sample average of known p1 - p0",
+    "extended_repetitions": 500,
+    "extended_rows": [
+      {
+        "bias": 0.00034333815513777215,
+        "bias_mc_ci_high": 0.0020816888784123146,
+        "bias_mc_ci_low": -0.0013950125681367704,
+        "bias_mc_se": 0.0008869136343237462,
+        "confounding_strength": 0.0,
+        "coverage": 0.958,
+        "coverage_ci_high": 0.9723679006652538,
+        "coverage_ci_low": 0.9366479487604386,
+        "estimator": "adjusted_aipw",
+        "index": 0,
+        "mean_estimate": 0.07845425548797752,
+        "n_runs": 500,
+        "rmse": 0.01981512459382232
+      },
+      {
+        "bias": 0.000772641946609037,
+        "bias_mc_ci_high": 0.0025987632629424157,
+        "bias_mc_ci_low": -0.0010534793697243414,
+        "bias_mc_se": 0.0009316945491496829,
+        "confounding_strength": 0.0,
+        "coverage": 0.96,
+        "coverage_ci_high": 0.9739594060486436,
+        "coverage_ci_low": 0.9390259449029252,
+        "estimator": "naive",
+        "index": 1,
+        "mean_estimate": 0.07888355927944879,
+        "n_runs": 500,
+        "rmse": 0.020826816542677856
+      },
+      {
+        "bias": 0.0006272145846899429,
+        "bias_mc_ci_high": 0.002456053649474878,
+        "bias_mc_ci_low": -0.0012016244800949925,
+        "bias_mc_se": 0.0009330811555025181,
+        "confounding_strength": 0.0,
+        "coverage": 0.96,
+        "coverage_ci_high": 0.9739594060486436,
+        "coverage_ci_low": 0.9390259449029252,
+        "estimator": "omitted_confounder_aipw",
+        "index": 2,
+        "mean_estimate": 0.0787381319175297,
+        "n_runs": 500,
+        "rmse": 0.020852888986168105
+      },
+      {
+        "bias": 0.00036904771528398916,
+        "bias_mc_ci_high": 0.002083079483136656,
+        "bias_mc_ci_low": -0.0013449840525686775,
+        "bias_mc_se": 0.0008745060040064626,
+        "confounding_strength": 0.0,
+        "coverage": 0.948,
+        "coverage_ci_high": 0.9642699800903735,
+        "coverage_ci_low": 0.9248983617059371,
+        "estimator": "oracle_aipw",
+        "index": 3,
+        "mean_estimate": 0.07847996504812374,
+        "n_runs": 500,
+        "rmse": 0.019538470026764853
+      },
+      {
+        "bias": 0.0004603732103642445,
+        "bias_mc_ci_high": 0.002380724214535255,
+        "bias_mc_ci_low": -0.0014599777938067659,
+        "bias_mc_se": 0.0009797709204954134,
+        "confounding_strength": 0.75,
+        "coverage": 0.952,
+        "coverage_ci_high": 0.9675350249087478,
+        "coverage_ci_low": 0.9295723199393156,
+        "estimator": "adjusted_aipw",
+        "index": 4,
+        "mean_estimate": 0.078571290543204,
+        "n_runs": 500,
+        "rmse": 0.021891265855596097
+      },
+      {
+        "bias": 0.0651506922796456,
+        "bias_mc_ci_high": 0.06704698579001134,
+        "bias_mc_ci_low": 0.06325439876927985,
+        "bias_mc_se": 0.0009674966889621127,
+        "confounding_strength": 0.75,
+        "coverage": 0.146,
+        "coverage_ci_high": 0.1796499333412706,
+        "coverage_ci_low": 0.11774829657860897,
+        "estimator": "naive",
+        "index": 5,
+        "mean_estimate": 0.14326160961248535,
+        "n_runs": 500,
+        "rmse": 0.06864183546679274
+      },
+      {
+        "bias": 0.06515873159973531,
+        "bias_mc_ci_high": 0.06704818159115888,
+        "bias_mc_ci_low": 0.06326928160831174,
+        "bias_mc_se": 0.0009640050976650837,
+        "confounding_strength": 0.75,
+        "coverage": 0.152,
+        "coverage_ci_high": 0.186114822839939,
+        "coverage_ci_low": 0.12319191165756974,
+        "estimator": "omitted_confounder_aipw",
+        "index": 6,
+        "mean_estimate": 0.14326964893257507,
+        "n_runs": 500,
+        "rmse": 0.0686249510893826
+      },
+      {
+        "bias": 0.0004629732987528883,
+        "bias_mc_ci_high": 0.0023571952771342564,
+        "bias_mc_ci_low": -0.0014312486796284798,
+        "bias_mc_se": 0.0009664397848884531,
+        "confounding_strength": 0.75,
+        "coverage": 0.946,
+        "coverage_ci_high": 0.9626259015148662,
+        "coverage_ci_low": 0.9225729387555679,
+        "estimator": "oracle_aipw",
+        "index": 7,
+        "mean_estimate": 0.07857389063159263,
+        "n_runs": 500,
+        "rmse": 0.021593593200881656
+      },
+      {
+        "bias": -0.00017195796803969737,
+        "bias_mc_ci_high": 0.0022310009387722933,
+        "bias_mc_ci_low": -0.002574916874851688,
+        "bias_mc_se": 0.0012259994422510157,
+        "confounding_strength": 1.5,
+        "coverage": 0.94,
+        "coverage_ci_high": 0.9576519139990498,
+        "coverage_ci_low": 0.9156384216937552,
+        "estimator": "adjusted_aipw",
+        "index": 8,
+        "mean_estimate": 0.07793895936480007,
+        "n_runs": 500,
+        "rmse": 0.027387292876629363
+      },
+      {
+        "bias": 0.10936285056034119,
+        "bias_mc_ci_high": 0.11127007304617857,
+        "bias_mc_ci_low": 0.1074556280745038,
+        "bias_mc_se": 0.0009730726968558106,
+        "confounding_strength": 1.5,
+        "coverage": 0.0,
+        "coverage_ci_high": 0.007624618530903363,
+        "coverage_ci_low": 0.0,
+        "estimator": "naive",
+        "index": 9,
+        "mean_estimate": 0.18747376789318093,
+        "n_runs": 500,
+        "rmse": 0.11150211410055538
+      },
+      {
+        "bias": 0.1092473181650128,
+        "bias_mc_ci_high": 0.11116355889156632,
+        "bias_mc_ci_low": 0.1073310774384593,
+        "bias_mc_se": 0.0009776738400783204,
+        "confounding_strength": 1.5,
+        "coverage": 0.0,
+        "coverage_ci_high": 0.007624618530903363,
+        "coverage_ci_low": 0.0,
+        "estimator": "omitted_confounder_aipw",
+        "index": 10,
+        "mean_estimate": 0.18735823549785255,
+        "n_runs": 500,
+        "rmse": 0.11140890336457274
+      },
+      {
+        "bias": 0.0001257095126128947,
+        "bias_mc_ci_high": 0.0024135340150898436,
+        "bias_mc_ci_low": -0.002162114989864054,
+        "bias_mc_se": 0.001167257399222933,
+        "confounding_strength": 1.5,
+        "coverage": 0.942,
+        "coverage_ci_high": 0.9593165352160771,
+        "coverage_ci_low": 0.9179433020026042,
+        "estimator": "oracle_aipw",
+        "index": 11,
+        "mean_estimate": 0.07823662684545266,
+        "n_runs": 500,
+        "rmse": 0.02607485821756014
+      }
+    ],
     "rows": [
       {
         "bias": -0.0021242994437296776,
+        "bias_mc_ci_high": 0.006664866494740948,
+        "bias_mc_ci_low": -0.010913465382200303,
+        "bias_mc_se": 0.004484268335954401,
         "confounding_strength": 0.0,
         "coverage": 1.0,
+        "coverage_ci_high": 1.0,
+        "coverage_ci_low": 0.7224598312333834,
         "estimator": "adjusted_dml",
         "index": 0,
-        "mean_estimate": 0.07607009937055849,
+        "mean_estimate": 0.0760700993705585,
         "n_runs": 10,
         "rmse": 0.013619493775695907
       },
       {
         "bias": -0.0006104942951953102,
+        "bias_mc_ci_high": 0.0107913039909275,
+        "bias_mc_ci_low": -0.012012292581318121,
+        "bias_mc_se": 0.005817244023532046,
         "confounding_strength": 0.0,
-        "coverage": NaN,
+        "coverage": 1.0,
+        "coverage_ci_high": 1.0,
+        "coverage_ci_low": 0.7224598312333834,
         "estimator": "naive",
         "index": 1,
         "mean_estimate": 0.07758390451909285,
@@ -636,8 +1257,13 @@
       },
       {
         "bias": -0.0012297067457870438,
+        "bias_mc_ci_high": 0.011397444898843227,
+        "bias_mc_ci_low": -0.013856858390417314,
+        "bias_mc_se": 0.006442424308484832,
         "confounding_strength": 0.0,
         "coverage": 1.0,
+        "coverage_ci_high": 1.0,
+        "coverage_ci_low": 0.7224598312333834,
         "estimator": "omitted_confounder_dml",
         "index": 2,
         "mean_estimate": 0.07696469206850112,
@@ -646,8 +1272,13 @@
       },
       {
         "bias": 0.0022072057060793576,
+        "bias_mc_ci_high": 0.012749290543526335,
+        "bias_mc_ci_low": -0.008334879131367622,
+        "bias_mc_se": 0.005378614712983152,
         "confounding_strength": 0.75,
         "coverage": 1.0,
+        "coverage_ci_high": 1.0,
+        "coverage_ci_low": 0.7224598312333834,
         "estimator": "adjusted_dml",
         "index": 3,
         "mean_estimate": 0.08040160452036751,
@@ -656,38 +1287,58 @@
       },
       {
         "bias": 0.06889912051369027,
+        "bias_mc_ci_high": 0.07815884769535891,
+        "bias_mc_ci_low": 0.05963939333202162,
+        "bias_mc_se": 0.004724350602892167,
         "confounding_strength": 0.75,
-        "coverage": NaN,
+        "coverage": 0.1,
+        "coverage_ci_high": 0.4041563854975721,
+        "coverage_ci_low": 0.01787574951572113,
         "estimator": "naive",
         "index": 4,
-        "mean_estimate": 0.14709351932797843,
+        "mean_estimate": 0.14709351932797846,
         "n_runs": 10,
         "rmse": 0.0703417671453557
       },
       {
         "bias": 0.06487848509366378,
+        "bias_mc_ci_high": 0.07541340243097523,
+        "bias_mc_ci_low": 0.05434356775635234,
+        "bias_mc_se": 0.005374957825158903,
         "confounding_strength": 0.75,
         "coverage": 0.0,
+        "coverage_ci_high": 0.2775401687666166,
+        "coverage_ci_low": 0.0,
         "estimator": "omitted_confounder_dml",
         "index": 5,
-        "mean_estimate": 0.14307288390795195,
+        "mean_estimate": 0.14307288390795198,
         "n_runs": 10,
         "rmse": 0.06685229519357497
       },
       {
         "bias": -0.017772367955113656,
+        "bias_mc_ci_high": -0.006755861991589708,
+        "bias_mc_ci_low": -0.028788873918637603,
+        "bias_mc_se": 0.005620666307920382,
         "confounding_strength": 1.5,
         "coverage": 1.0,
+        "coverage_ci_high": 1.0,
+        "coverage_ci_low": 0.7224598312333834,
         "estimator": "adjusted_dml",
         "index": 6,
-        "mean_estimate": 0.060422030859174504,
+        "mean_estimate": 0.06042203085917451,
         "n_runs": 10,
         "rmse": 0.024498654461763258
       },
       {
-        "bias": 0.1134215373046461,
+        "bias": 0.11342153730464613,
+        "bias_mc_ci_high": 0.12337818683231931,
+        "bias_mc_ci_low": 0.10346488777697295,
+        "bias_mc_se": 0.005079923228404683,
         "confounding_strength": 1.5,
-        "coverage": NaN,
+        "coverage": 0.0,
+        "coverage_ci_high": 0.2775401687666166,
+        "coverage_ci_low": 0.0,
         "estimator": "naive",
         "index": 7,
         "mean_estimate": 0.1916159361189343,
@@ -696,8 +1347,13 @@
       },
       {
         "bias": 0.10934997239044959,
+        "bias_mc_ci_high": 0.12175510380389493,
+        "bias_mc_ci_low": 0.09694484097700426,
+        "bias_mc_se": 0.006329148680329251,
         "confounding_strength": 1.5,
         "coverage": 0.0,
+        "coverage_ci_high": 0.2775401687666166,
+        "coverage_ci_low": 0.0,
         "estimator": "omitted_confounder_dml",
         "index": 8,
         "mean_estimate": 0.18754437120473774,

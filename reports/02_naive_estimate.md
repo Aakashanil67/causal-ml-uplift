@@ -1,26 +1,21 @@
 # Naive estimate: difference in means
 
-Treated = received either email (Mens or Womens), control = No E-Mail. On an RCT this
-comparison is unbiased by design, so unlike the usual textbook framing, this is a real
-estimate here, not just a demonstration of what goes wrong. Whether the design assumption
-actually holds in this file is checked below, not just asserted.
+Treated customers received either email (Mens or Womens); controls received No E-Mail. Under the randomized assignment design, the difference in means estimates the average effect of assignment to the email mixture. The balance table is a descriptive check on this file, not proof that randomization worked.
 
 ## Outcome differences
 
-| outcome | treated mean | control mean | diff | 95% CI |
-|---|---|---|---|---|
-| visit | 0.16705 | 0.10617 | +0.06088 | [0.05544, 0.06633] |
-| conversion | 0.01068 | 0.00573 | +0.00495 | [0.00355, 0.00636] |
-| spend | 1.24959 | 0.65279 | +0.59680 | [0.37619, 0.81741] |
+| outcome | treated mean | control mean | difference | 95% CI |
+|---|---:|---:|---:|---:|
+| visit | 16.70% | 10.62% | +6.09pp | [+5.54pp, +6.63pp] |
+| conversion | 1.07% | 0.57% | +0.50pp | [+0.35pp, +0.64pp] |
+| spend | $1.250 | $0.653 | $+0.597 | [$0.376, $0.817] |
 
 ## Covariate balance
 
-Standardised difference = (treated mean − control mean) / pooled SD. Values inside ±0.1
-are the usual threshold for calling a covariate balanced (Austin, 2009); nothing here is a
-real pre-treatment difference if the randomisation worked as intended.
+Standardised difference is the treated-minus-control mean divided by the pooled standard deviation. A value near zero is consistent with balance on that measured covariate; balance cannot test unmeasured causes.
 
-| covariate | treated mean | control mean | standardised diff |
-|---|---|---|---|
+| covariate | treated mean | control mean | standardised difference |
+|---|---:|---:|---:|
 | recency | 5.7707 | 5.7497 | +0.0060 |
 | history | 242.6860 | 240.8827 | +0.0071 |
 | mens | 0.5499 | 0.5532 | -0.0066 |
@@ -33,17 +28,4 @@ real pre-treatment difference if the randomisation worked as intended.
 | channel=Phone | 0.4379 | 0.4378 | +0.0002 |
 | channel=Web | 0.4414 | 0.4399 | +0.0029 |
 
-Largest standardised difference: 0.0088. 0 of 11
-covariates (across numeric, binary and one row per categorical level) exceed the 0.1
-threshold. This is the sanity check the randomisation claim in
-`reports/01_causal_question.md` rests on: it is a testable statement about this file, not
-an assumption. `reports/06_confounding_benchmark.md` shows what this table looks like when
-that assumption is deliberately violated.
-
-**Why this comparison would be biased without randomisation.** If treatment had been
-chosen by a marketer rather than a coin flip, a nonzero standardised difference on
-`history` or `recency` above would mean the treated and control groups differed in ways
-that independently predict the outcome, and the diff-in-means table above would then be
-mixing the true effect of the email with the effect of already being a different kind of
-customer. That confound is exactly what `src/confounded.py` reconstructs on purpose,
-using this same dataset, to make the size of that bias visible.
+Largest defined absolute standardised difference: 0.0088; 0 of 11 defined covariates exceed 0.1. This is a descriptive randomization check. The constructed selection exercise in `reports/06_confounding_benchmark.md` shows how results move under specified selection mechanisms; differences from the full experiment are not known bias for a changed target population.

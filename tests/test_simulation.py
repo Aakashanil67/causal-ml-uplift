@@ -24,6 +24,9 @@ def test_monte_carlo_has_three_estimators_and_declared_strengths():
     assert (results["n_runs"] == 2).all()
     assert results["bias"].notna().all()
     assert results["rmse"].notna().all()
+    assert results["bias_mc_ci_low"].notna().all()
+    assert (results["bias_mc_ci_low"] <= results["bias"]).all()
+    assert (results["bias"] <= results["bias_mc_ci_high"]).all()
 
 
 def test_omitting_the_confounder_is_worse_under_strong_selection():
@@ -32,3 +35,21 @@ def test_omitting_the_confounder_is_worse_under_strong_selection():
     adjusted = results.loc[results["estimator"] == "adjusted_dml", "bias"].abs().iloc[0]
 
     assert omitted > adjusted
+
+
+def test_extended_simulation_reports_aipw_and_oracle_monte_carlo_uncertainty():
+    from src.simulation import run_extended_monte_carlo
+
+    results = run_extended_monte_carlo(strengths=(0.0, 1.5), n_runs=3, n=500, seed=31)
+
+    assert set(results["estimator"]) == {
+        "naive",
+        "adjusted_aipw",
+        "omitted_confounder_aipw",
+        "oracle_aipw",
+    }
+    assert (results["n_runs"] == 3).all()
+    assert results["bias_mc_ci_low"].le(results["bias"]).all()
+    assert results["bias"].le(results["bias_mc_ci_high"]).all()
+    assert results["coverage_ci_low"].notna().all()
+    assert results["coverage_ci_high"].notna().all()

@@ -8,12 +8,11 @@ logic runs. Implementing the three refuters by hand keeps the actual estimator t
 under test — the same `LinearDML` + `build_covariate_matrix()` pipeline every other report uses —
 rather than switching to a different, less-integrated estimator just to satisfy the wrapper.
 
-None of these three refuters test what `src/confounded.py`'s benchmark tests. They test whether the
-*estimation procedure* is well-behaved (insensitive to label noise, insensitive to irrelevant
-covariates, stable across subsamples) — not whether the *identification assumption* holds. An
-estimate biased by an omitted confounder can still pass all three: this module runs them on
-`confounded.py`'s already-known-biased estimate (variant 2, `newbie` withheld) to show that
-directly, rather than asserting it.
+None of these three refuters tests whether the identification assumption holds. They record
+whether the fitted estimate responds to label shuffling, irrelevant noise, and selected subsamples.
+The constructed Hillstrom sample targets a different covariate distribution from the full RCT, so
+its difference from the RCT estimate is not known bias. The fully synthetic simulation is where
+bias and coverage are checked against known targets.
 """
 
 import numpy as np
@@ -136,146 +135,104 @@ def _refuter_table_rows(
 def write_refutation_report(
     original_ate: float,
     rct_results: dict,
-    confounded_ate_known_biased: float,
-    confounded_benchmark: float,
-    confounded_results: dict,
+    selected_sample_ate: float,
+    experimental_reference: float,
+    selected_sample_results: dict,
     out_path,
 ) -> None:
     rct_rows, rct_passes = _refuter_table_rows(rct_results, original_ate, "PASS", "FAIL")
-    conf_rows, conf_passes = _refuter_table_rows(
-        confounded_results, confounded_ate_known_biased, '"PASSES"', "flags something"
+    selected_rows, selected_passes = _refuter_table_rows(
+        selected_sample_results, selected_sample_ate, "PASS", "FAIL"
     )
-    rct_all_pass = all(rct_passes)
-    conf_all_pass = all(conf_passes)
-
     lines = [
-        "# Refutation tests: what passing does and does not prove",
+        "# Refutation checks: what these results do and do not establish",
         "",
-        "Placebo treatment, random common cause, and data-subset refutation, run against this",
-        "project's own `LinearDML` pipeline (`src/dml_ate.py`) rather than through DoWhy's",
-        "`refute_estimate()` wrapper, which fails on this project's categorical covariates before",
-        "any refutation logic runs (see `src/refute.py`'s docstring). Run twice: once on the real,",
-        "unconfounded RCT, and once on `src/confounded.py`'s already-known-biased estimate, to show",
-        "directly what these tests can and cannot catch, rather than asserting it.",
+        "Placebo treatment, random common cause, and data-subset checks run against this",
+        "project's `LinearDML` implementation (`src/dml_ate.py`). They record the outcomes of",
+        "these particular checks; passing does not certify identification or general estimator",
+        "behavior.",
         "",
-        "## On the real RCT",
+        "## On the randomized Hillstrom sample",
         "",
-        f"Original pooled DML ATE on `visit`: **{original_ate:+.4f}** (`reports/05_dml_ate.md`).",
+        f"Pooled DML estimate on `visit`: **{original_ate:+.4f}**.",
         "",
         *rct_rows,
         "",
     ]
-    if rct_all_pass:
+    if all(rct_passes):
         lines += [
-            "All three pass, and here is exactly what that does and does not mean. The placebo",
-            "test shows the estimator does not manufacture an effect out of nothing when there is",
-            "genuinely nothing there. The random-common-cause test shows adding an irrelevant",
-            "column does not move the number, which it shouldn't. The subset test shows the",
-            "estimate does not depend on which 80% of customers happened to be sampled.",
+            "All three checks met their stated criteria on this sample. The placebo interval",
+            "contains zero, adding random noise leaves the estimate close to its original value,",
+            "and the selected 80% refits vary little. These outcomes do not replace the randomized",
+            "assignment design or test for an omitted common cause.",
         ]
     else:
-        failed = [
-            name
-            for name, ok in zip(
-                ["placebo", "random common cause", "subset"], rct_passes, strict=True
-            )
-            if not ok
-        ]
-        lines += [
-            f"Not a clean sweep: {', '.join(failed)} did not pass on this run and would need",
-            "investigating before trusting the headline estimate further, rather than being",
-            "explained away.",
-        ]
+        lines.append(
+            "At least one check missed its stated criterion on this run. That result calls for",
+            "inspection of that diagnostic; the thresholds are not a universal correctness test.",
+        )
     lines += [
-        "None of these three tests the one assumption this project's identification claim",
-        "actually rests on: that treatment assignment had no unobserved cause in common with the",
-        "outcome. That assumption is not refuted here; it holds by design, because Hillstrom is",
-        "randomised (`reports/01_causal_question.md`, `reports/04_identification.md`), and no",
-        "refutation test run on the data after the fact can substitute for that design fact.",
         "",
-        "## On a known-biased estimate, to show what these tests miss",
+        "## On a constructed selected sample",
         "",
-        "`src/confounded.py`'s variant 2 (`newbie` withheld from the estimator) already showed a",
-        f"DML estimate of **{confounded_ate_known_biased:+.4f}**, confidence interval excluding the",
-        f"true benchmark of **{confounded_benchmark:+.4f}** (`reports/06_confounding_benchmark.md`).",
-        "This is a real, demonstrated bias. Running the same three refuters against it, with the",
-        "same `newbie` column withheld so this is testing the actual biased model and not a",
-        "different, better-specified one:",
+        f"The selected-sample estimate is **{selected_sample_ate:+.4f}**. The full-RCT estimate",
+        f"of **{experimental_reference:+.4f}** is an estimated reference for a different population.",
+        "Selection changes the covariate distribution, so the difference between these point",
+        "estimates is descriptive and does not establish bias for the selected population.",
         "",
-        *conf_rows,
+        *selected_rows,
         "",
     ]
-    if conf_all_pass:
+    if all(selected_passes):
         lines += [
-            "The quotation marks are deliberate. These refuters test properties an estimator can",
-            "hold regardless of whether it is right, so a confounded, biased estimate sails",
-            "through all three exactly as cleanly as a correct one does, which is what the table",
-            "above shows happening.",
+            "These checks met their stated criteria for this fitted selected-sample model. That",
+            "does not establish that its estimate is correct for the selected population, and it",
+            "does not show that the checks would detect other forms of confounding.",
         ]
     else:
-        passed = [
-            name
-            for name, ok in zip(
-                ["placebo", "random common cause", "subset"], conf_passes, strict=True
-            )
-            if ok
-        ]
-        lines += [
-            f"Not every refuter passed here ({', '.join(passed) if passed else 'none did'}), but",
-            "that undersells the point rather than making it: a refuter catching this specific,",
-            "engineered bias is not evidence these tests would catch a real, unknown confounder in",
-            "an actual observational study, where nothing is engineered to be findable.",
-        ]
+        lines.append(
+            "At least one check missed its stated criterion here. That outcome is specific to",
+            "this fitted sample and does not determine the estimate's bias for its target population.",
+        )
     lines += [
         "",
-        "The only thing in this project that actually tested the identification assumption",
-        "itself was `reports/06_confounding_benchmark.md`'s comparison against a known",
-        "experimental benchmark, because that is the one place a ground truth existed to check",
-        "against. Most real observational studies do not have that luxury, which is the honest",
-        "limitation worth sitting with: these three refutation tests are a standard part of the",
-        "DoWhy workflow and worth running, but passing them is not evidence against omitted-",
-        "variable bias, and no one should present it as such.",
+        "The fully synthetic experiment in `reports/results.json` is where the generating",
+        "probabilities, sample-average target, bias, and coverage are known. Refutation checks are",
+        "useful challenges to particular estimates, not universal certificates of correctness.",
     ]
     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def main() -> None:
     from src.config import REPORTS_DIR
-    from src.confounded import dml_estimate, make_confounded_sample
+    from src.confounded import run_variant
     from src.data_loader import load_hillstrom
     from src.dml_ate import dml_ate
 
     df = load_hillstrom()
-    print("running refuters on the real RCT...")
     original = dml_ate(df, TREATMENT_COL, "visit")
     rct_results = {
         "placebo": placebo_treatment_refuter(df, "visit"),
         "random_cause": random_common_cause_refuter(df, "visit"),
         "subset": data_subset_refuter(df, "visit"),
     }
-    print("original ATE:", original["ate"])
-    print(rct_results)
 
-    print("running refuters on the known-biased confounded estimate...")
-    confounded_sample = make_confounded_sample(df, ["newbie"], {"newbie": -1}, strength=1.5)
-    confounded_biased = dml_estimate(confounded_sample, "visit", drop_cols=["newbie"])
-    confounded_results = {
-        "placebo": placebo_treatment_refuter(confounded_sample, "visit", drop_cols=["newbie"]),
+    selected = run_variant(df, "visit", ["newbie"], {"newbie": -1}, 1.5, withhold=["newbie"])
+    selected_results = {
+        "placebo": placebo_treatment_refuter(selected["sample"], "visit", drop_cols=["newbie"]),
         "random_cause": random_common_cause_refuter(
-            confounded_sample, "visit", drop_cols=["newbie"]
+            selected["sample"], "visit", drop_cols=["newbie"]
         ),
-        "subset": data_subset_refuter(confounded_sample, "visit", drop_cols=["newbie"]),
+        "subset": data_subset_refuter(selected["sample"], "visit", drop_cols=["newbie"]),
     }
-    print("confounded (biased) ATE:", confounded_biased["ate"])
-    print(confounded_results)
 
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     write_refutation_report(
         original["ate"],
         rct_results,
-        confounded_biased["ate"],
+        selected["dml"]["ate"],
         original["ate"],
-        confounded_results,
+        selected_results,
         REPORTS_DIR / "08_refutations.md",
     )
 
