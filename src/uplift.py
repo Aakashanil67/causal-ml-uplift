@@ -222,7 +222,7 @@ def plot_qini_curve(curve: pd.DataFrame, qini_coef: float, out_path) -> None:
         curve["k_frac"] * 100, curve["gain"], curve["random_line"], alpha=0.15, color="#5b7fb5"
     )
     ax.set_xlabel("% of customers targeted (top-k by predicted uplift)")
-    ax.set_ylabel("cumulative incremental visits")
+    ax.set_ylabel("raw Qini gain (treated-count-rescaled visits)")
     ax.set_title(f"Qini curve (coefficient: {qini_coef:.2f})")
     ax.legend(fontsize=9)
     fig.tight_layout()

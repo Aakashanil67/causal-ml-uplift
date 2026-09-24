@@ -45,6 +45,28 @@ def policy_forest_recommendations(pf: DRPolicyForest, df: pd.DataFrame) -> np.nd
     return np.array([names[c] for c in codes])
 
 
+def policy_comparison_conclusion(ci_low: float, ci_high: float) -> str:
+    """Summarize which policy has higher expected visit value from its paired interval."""
+    if ci_low > ci_high:
+        raise ValueError("policy comparison interval lower endpoint exceeds upper endpoint")
+    if ci_low <= 0 <= ci_high:
+        return (
+            "Held-out evidence does not establish which policy has higher expected visit value. "
+            "Blanket mens emailing is the simpler action for this experiment; validate any "
+            "learned policy on another campaign before broader deployment."
+        )
+    if ci_low > 0:
+        return (
+            "Held-out evidence supports higher expected visit value for the learned policy than "
+            "blanket mens emailing in this evaluation. Validate this campaign-specific result "
+            "before broader deployment."
+        )
+    return (
+        "Held-out evidence supports higher expected visit value for blanket mens emailing than "
+        "for the learned policy in this evaluation."
+    )
+
+
 def heuristic_recommendations(df: pd.DataFrame) -> np.ndarray:
     """Match exclusive history and use the stronger overall mens creative for dual buyers."""
     mens = df["mens"].to_numpy() == 1
@@ -71,6 +93,50 @@ def incremental_net_value(
     if email_cost < 0:
         raise ValueError("email_cost must be non-negative")
     return (policy_spend - no_email_spend) * gross_margin - contact_rate * email_cost
+
+
+def incremental_net_value_interval(
+    spend_difference_low: float,
+    spend_difference_high: float,
+    contact_rate_difference: float,
+    gross_margin: float,
+    email_cost: float,
+) -> tuple[float, float]:
+    """Transform a paired reported-spend interval under fixed margin and contact-cost inputs."""
+    if not 0 <= gross_margin <= 1:
+        raise ValueError("gross_margin must be between 0 and 1")
+    if email_cost < 0:
+        raise ValueError("email_cost must be non-negative")
+    if spend_difference_low > spend_difference_high:
+        raise ValueError("spend interval lower endpoint must not exceed its upper endpoint")
+    contact_cost = contact_rate_difference * email_cost
+    return (
+        spend_difference_low * gross_margin - contact_cost,
+        spend_difference_high * gross_margin - contact_cost,
+    )
+
+
+def incremental_net_value_with_interval(
+    spend_difference: float,
+    spend_difference_low: float,
+    spend_difference_high: float,
+    contact_rate_difference: float,
+    gross_margin: float,
+    email_cost: float,
+) -> dict[str, float]:
+    """Return point and paired conditional interval under fixed economic assumptions."""
+    ci_low, ci_high = incremental_net_value_interval(
+        spend_difference_low,
+        spend_difference_high,
+        contact_rate_difference,
+        gross_margin,
+        email_cost,
+    )
+    return {
+        "value": spend_difference * gross_margin - contact_rate_difference * email_cost,
+        "ci_low": ci_low,
+        "ci_high": ci_high,
+    }
 
 
 def break_even_margin(
@@ -121,19 +187,48 @@ def dr_policy_contributions(
     rec = np.asarray(recommended_arm)
     if len(rec) != len(df) or len(outcome_predictions) != len(df):
         raise ValueError("Recommendations and outcome predictions must align with df.")
-    missing = set(np.unique(np.concatenate([actual_arm, rec]))) - set(outcome_predictions.columns)
+    if not df.index.is_unique or not outcome_predictions.index.is_unique:
+        raise ValueError("df and outcome-prediction indices must be unique.")
+    if not outcome_predictions.index.equals(df.index):
+        if set(outcome_predictions.index) != set(df.index):
+            raise ValueError("df and outcome-prediction indices must match.")
+        outcome_predictions = outcome_predictions.reindex(df.index)
+
+    actions = set(np.unique(np.concatenate([actual_arm, rec])))
+    unsupported = actions - set(ARMS)
+    if unsupported:
+        raise ValueError(
+            f"Recommendations or observed treatment contain unsupported action: {sorted(unsupported)}"
+        )
+    missing = actions - set(outcome_predictions.columns)
     if missing:
         raise ValueError(f"Outcome predictions missing arms: {sorted(missing)}")
+    if outcome_col not in df:
+        raise ValueError(f"Outcome column {outcome_col!r} is missing from df.")
+    outcomes = df[outcome_col].to_numpy(dtype=float)
+    if not np.isfinite(outcomes).all():
+        raise ValueError("Observed outcomes must contain only finite values.")
+    try:
+        probabilities = np.array([propensities[arm] for arm in actual_arm], dtype=float)
+    except KeyError as error:
+        raise ValueError(f"Propensities are missing observed action {error.args[0]!r}.") from error
+    if not np.isfinite(probabilities).all() or (probabilities <= 0).any():
+        raise ValueError("Propensities for observed actions must be finite and strictly positive.")
+    if (probabilities > 1).any():
+        raise ValueError("Propensities must not exceed one.")
+    if not np.isfinite(outcome_predictions.to_numpy(dtype=float)).all():
+        raise ValueError("Outcome predictions must contain only finite values.")
 
     row = np.arange(len(df))
-    mu_rec = outcome_predictions.to_numpy()[row, outcome_predictions.columns.get_indexer(rec)]
-    mu_actual = outcome_predictions.to_numpy()[
-        row, outcome_predictions.columns.get_indexer(actual_arm)
-    ]
+    rec_idx = outcome_predictions.columns.get_indexer(rec)
+    actual_idx = outcome_predictions.columns.get_indexer(actual_arm)
+    if (rec_idx < 0).any() or (actual_idx < 0).any():
+        raise ValueError("Outcome predictions are missing an action required for evaluation.")
+    mu_rec = outcome_predictions.to_numpy()[row, rec_idx]
+    mu_actual = outcome_predictions.to_numpy()[row, actual_idx]
     matched = actual_arm == rec
-    p = np.array([propensities[arm] for arm in actual_arm])
-    residual = df[outcome_col].to_numpy(dtype=float) - mu_actual
-    return mu_rec + matched * residual / p
+    residual = outcomes - mu_actual
+    return mu_rec + matched * residual / probabilities
 
 
 def dr_policy_value(

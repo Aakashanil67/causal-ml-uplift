@@ -4,7 +4,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from app.simulator import plot_cate_gauge
+from app.simulator import (
+    format_probability_difference,
+    format_probability_level,
+    plot_cate_gauge,
+)
 
 
 def test_plot_cate_gauge_returns_a_figure():
@@ -12,6 +16,11 @@ def test_plot_cate_gauge_returns_a_figure():
     fig = plot_cate_gauge(0.05, eval_cate)
     assert fig is not None
     assert len(fig.axes) == 1
+
+
+def test_probability_level_and_probability_difference_have_distinct_units():
+    assert format_probability_level(0.0601) == "6.01%"
+    assert format_probability_difference(0.0601) == "+6.01 pp"
 
 
 def test_streamlit_request_path_does_not_fit_causal_models():
@@ -35,7 +44,7 @@ def test_policy_tab_exposes_manifest_backed_decision_controls():
     assert '"email everyone (womens creative)"' in source or "recommendation_shares" in source
     assert "Assumed gross margin" in source
     assert "Cost per email" in source
-    assert "reported and capped" in source
+    assert "may be top-coded" in source
     assert "not profit" in source
 
 
@@ -58,9 +67,9 @@ def test_app_runs_end_to_end_without_exceptions():
     # segment, the counterfactual all-email estimand. It must not revert to the old Qini-gain
     # denominator (+0.0499) that divided by all selected rows.
     assert metrics["Customers targeted"] == "5,760 / 19,200"
-    assert metrics["Incremental visits per customer emailed"] == "+0.0603"
+    assert metrics["Incremental visit-rate difference per customer emailed"] == "+6.03 pp"
     warnings = [item.value for item in at.warning]
-    assert any("Normalized Qini" in text and "includes zero" in text for text in warnings)
+    assert any("Normalized Qini" in text and "crosses zero" in text for text in warnings)
     assert any(item.label == "Assumed gross margin" for item in at.get("slider"))
     assert any(item.label == "Cost per email" for item in at.get("number_input"))
-    assert any("reported and capped" in text and "not profit" in text for text in warnings)
+    assert any("may be top-coded" in text and "not profit" in text for text in warnings)

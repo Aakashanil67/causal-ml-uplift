@@ -112,6 +112,10 @@ def build_covariate_matrix(df: pd.DataFrame) -> pd.DataFrame:
     numeric = df[NUMERIC_COVARIATES + BINARY_COVARIATES].astype(float)
     categorical = df[CATEGORICAL_COVARIATES].copy()
     for col, levels in CATEGORICAL_LEVELS.items():
+        unsupported = ~categorical[col].isin(levels)
+        if unsupported.any():
+            values = sorted({str(value) for value in categorical.loc[unsupported, col].tolist()})
+            raise ValueError(f"{col} contains unsupported category values: {values}")
         categorical[col] = pd.Categorical(categorical[col], categories=levels)
     dummies = pd.get_dummies(categorical, drop_first=True, dtype=float)
     return pd.concat([numeric, dummies], axis=1)
@@ -133,7 +137,7 @@ def main() -> None:
     print("\noutcome rates by arm:")
     print(outcome_rates(df))
     print(f"\nnon-zero spend: {(df['spend'] > 0).sum()} rows")
-    print(f"spend censored at 499.00: {(df['spend'] == 499.0).sum()} rows")
+    print(f"reported spend equals $499: {(df['spend'] == 499.0).sum()} rows")
 
 
 if __name__ == "__main__":
