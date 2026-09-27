@@ -1,6 +1,8 @@
 import ast
+import json
 from pathlib import Path
 
+import joblib
 import numpy as np
 import pytest
 
@@ -46,6 +48,27 @@ def test_policy_tab_exposes_manifest_backed_decision_controls():
     assert "Cost per email" in source
     assert "may be top-coded" in source
     assert "not profit" in source
+
+
+def test_policy_interval_caption_preserves_literal_currency(monkeypatch):
+    from streamlit.testing.v1 import AppTest
+
+    import app.simulator as simulator
+    from src.config import EVALUATION_ARTIFACT_PATH, RESULTS_PATH
+
+    # Isolate caption rendering from artifact provenance; the full app test validates loading.
+    artifact = joblib.load(EVALUATION_ARTIFACT_PATH)["payload"]
+    results = json.loads(RESULTS_PATH.read_text(encoding="utf-8"))
+    monkeypatch.setattr(simulator, "get_public_artifacts", lambda: (artifact, results))
+    monkeypatch.setattr(
+        simulator, "get_eval_artifacts", lambda: (artifact["eval_df"], artifact["cate"])
+    )
+    at = AppTest.from_string("from app.simulator import render_policy_tab\nrender_policy_tab()")
+    at.run(timeout=60)
+    assert not at.exception
+    captions = [c.value for c in at.caption if c.value.startswith("95% paired conditional")]
+    assert len(captions) == 2
+    assert all(caption.count(r"\$") == 2 for caption in captions)
 
 
 @pytest.mark.slow

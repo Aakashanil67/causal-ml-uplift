@@ -29,6 +29,9 @@ body { font-family: Georgia, 'Times New Roman', serif; max-width: 880px; margin:
 h1 { font-size: 20pt; margin-bottom: 4px; }
 h2 { font-size: 13pt; margin-top: 28px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
 h3 { font-size: 11.5pt; }
+@media print {
+  h1, h2, h3 { break-after: avoid; page-break-after: avoid; }
+}
 table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 9.5pt; }
 th, td { border: 1px solid #999; padding: 5px 8px; text-align: left; }
 th { background: #eef2f7; }

@@ -15,5 +15,5 @@ the artifact without rebuilding the provenance metadata.
 
 Current artifact checksums:
 
-- `causal_forest.joblib`: `d1b39f6639dd044b73f2da6520e3bd2d420fbe1af609fc8333e7c43a893abd3d`
-- `evaluation_artifacts.joblib`: `56414a0a404063594feedd165585365d5f12cf5de1b6174df1626890341104d9`
+- `causal_forest.joblib`: `85b68bb5e567ad7e53a157875746ffb3404a515aec4f2517a73c5eff4045d133`
+- `evaluation_artifacts.joblib`: `568bc9f1207b1faa982a7dc6d44d7f58968337a2ad34f09372472f17f12ef312`

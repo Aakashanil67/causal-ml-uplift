@@ -2,8 +2,28 @@ import hashlib
 import json
 
 import pytest
+from pypdf import PdfReader
 
+from src.config import REPORTS_DIR
 from src.render_report import find_chrome, pdf_freshness_path, pdf_is_current, render_pdf
+
+
+def test_report_section_seven_heading_stays_with_its_opening_paragraph(tmp_path):
+    try:
+        find_chrome()
+    except FileNotFoundError:
+        pytest.skip("no Chrome executable available in this environment")
+
+    md_path = tmp_path / "report.md"
+    md_path.write_text(
+        (REPORTS_DIR / "causal_report.md").read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    pdf = render_pdf(md_path)
+    pages = [page.extract_text() for page in PdfReader(pdf).pages]
+    heading_pages = [page for page in pages if "7. Three actions, not two" in page]
+
+    assert len(heading_pages) == 1
+    assert "Cross-fitted doubly robust evaluation" in heading_pages[0]
 
 
 def test_pdf_freshness_normalizes_markdown_newlines_and_hashes_pdf_as_binary(tmp_path):
