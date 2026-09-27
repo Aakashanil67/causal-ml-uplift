@@ -306,8 +306,8 @@ def render_policy_tab():
         )
         st.metric(f"{label} (per customer)", f"${contribution['value']:+.4f}")
         st.caption(
-            f"95% paired conditional interval: [${contribution['ci_low']:+.4f}, "
-            f"${contribution['ci_high']:+.4f}]. The interval transforms the stored reported-spend "
+            f"95% paired conditional interval: [\\${contribution['ci_low']:+.4f}, "
+            f"\\${contribution['ci_high']:+.4f}]. The interval transforms the stored reported-spend "
             "comparison under the selected fixed margin and email cost."
         )
     st.caption(
