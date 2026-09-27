@@ -229,7 +229,7 @@
       "channel"
     ],
     "git_dirty": true,
-    "git_sha": "4d279d931693",
+    "git_sha": "e9c2e798ff73",
     "packages": {
       "econml": "0.16.0",
       "lightgbm": "4.7.0",
@@ -238,7 +238,7 @@
       "scikit-learn": "1.5.2"
     },
     "random_seed": 42,
-    "source_sha256": "54610a253cb1cdf71c4fd44776a459f5f2dd3b92b31305286f2b6ef704edd536"
+    "source_sha256": "c81b868bac16cf09ad31ea952f8f5b1bc817a9ee4138016798e053b103cf214f"
   },
   "naive": {
     "balance": [
@@ -516,9 +516,9 @@
   },
   "ranking": {
     "cate_summary": {
-      "max": 0.12915934475560065,
+      "max": 0.1291593447556007,
       "mean": 0.06031053776029973,
-      "min": -0.007257459259963843,
+      "min": -0.007257459259963847,
       "std": 0.023000337969603015
     },
     "deciles": [
@@ -544,7 +544,7 @@
         "decile": 3,
         "n": 1920,
         "observed_uplift": 0.08559194742501629,
-        "pred_cate_mean": 0.06844329809612848
+        "pred_cate_mean": 0.06844329809612847
       },
       {
         "decile": 4,
