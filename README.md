@@ -3,33 +3,35 @@
 [![CI](https://github.com/Aakashanil67/causal-ml-uplift/actions/workflows/ci.yml/badge.svg)](https://github.com/Aakashanil67/causal-ml-uplift/actions/workflows/ci.yml)
 ![Python 3.12](https://img.shields.io/badge/python-3.12-blue)
 
-Can causal ML find deployable treatment-effect heterogeneity, or only a reliable average effect? This project tests that distinction on Hillstrom's randomised email experiment.
+Does a marketing email work equally well for every customer, and can a model pick out the customers worth emailing? This project tests both questions on Hillstrom's email experiment, where 64,000 customers were randomly split into three groups: no email, a mens email, or a womens email.
 
-**[Full report (PDF)](reports/causal_report.pdf)** · **[live simulator](https://causal-ml-uplift.streamlit.app/)** · Hillstrom e-mail experiment, 64,000 customers, three arms.
+[Full report (PDF)](reports/causal_report.pdf) · [Live simulator](https://causal-ml-uplift.streamlit.app/)
 
 ![causal graph](reports/figures/dag.png)
 
 ## The problem
 
-"Customers who got the email visited more" is not the same claim as "the email caused them to visit." Hillstrom's data lets the assignment effect be estimated because treatment was randomly assigned before the campaign ran (`reports/01_causal_question.md`); the covariate balance check is also computed and reported (`reports/02_naive_estimate.md`).
+Customers who received an email visited the website more often. On its own, that does not show the email caused the extra visits. In this dataset it does, because customers were assigned to groups at random before the campaign started. The groups also look alike on the recorded customer details (`reports/02_naive_estimate.md`), which is what random assignment should produce.
 
-The harder problem is whether estimated treatment effects can support a useful targeting rule. `reports/06_confounding_benchmark.md` uses constructed Hillstrom selection as a descriptive diagnostic against an estimated experimental reference. The fully synthetic Monte Carlo benchmark supplies known targets for bias and coverage claims.
+The harder question is whether the effect differs enough between customers to be worth targeting. An average effect tells you the email is worth sending. It does not tell you who to send it to.
 
 ## Results
 
-Pooled `LinearDML` effects for assignment to either email rather than no email:
+Effect of being sent either email, compared with no email. "pp" means percentage points.
 
-| outcome | DML ATE | 95% CI |
+| outcome | estimate (LinearDML) | 95% interval |
 |---|---:|---:|
 | visit | +6.01pp | [+5.48pp, +6.55pp] |
 | conversion | +0.50pp | [+0.36pp, +0.64pp] |
 | spend | +$0.613 | [$0.389, $0.837] |
 
-The pooled visit effect corresponds to about 60 additional visits per 1,000 customers assigned email. The forest produces varying conditional-effect predictions. Normalized Qini is 0.0111 [-0.0114, 0.0331]; across five honest splits it ranges from 0.0111 to 0.0360. The interval crosses zero, so this analysis does not establish a positive ranking advantage. The repository does not claim that individual uplift ordering is deployment-ready.
+The visit effect works out to about 60 extra visits for every 1,000 customers emailed.
 
-Three-action policies are evaluated with cross-fitted doubly robust scores:
+Targeting is the harder part. The Qini score checks whether ranking customers by their predicted effect does better than emailing them in random order. It came out at 0.0111, with a 95% interval from -0.0114 to 0.0331. That interval includes zero, so the ranking may be no better than random order. Over five different train and test splits, the score ranged from 0.0111 to 0.0360.
 
-| policy | expected visit rate | 95% CI |
+I also compared five rules for deciding which email, if any, each customer gets. Each rule is scored on customers the model never saw during training:
+
+| rule | expected visit rate | 95% interval |
 |---|---:|---:|
 | learned (DRPolicyForest) | 18.23% | [17.30%, 19.16%] |
 | email everyone (mens creative) | 18.10% | [17.19%, 19.02%] |
@@ -37,21 +39,23 @@ Three-action policies are evaluated with cross-fitted doubly robust scores:
 | purchase-history heuristic | 18.48% | [17.51%, 19.40%] |
 | email nobody | 10.70% | [9.94%, 11.51%] |
 
-Learned minus blanket mens is +0.13pp [-0.14pp, +0.40pp]. Held-out evidence does not establish which policy has higher expected visit value. Blanket mens emailing is the simpler action for this experiment; validate any learned policy on another campaign before broader deployment.
+The learned rule's lead over emailing everyone the mens creative is +0.13pp, with an interval from -0.14pp to +0.40pp. The data cannot say which of the two is better. Emailing everyone the mens creative is simpler and does about as well. The highest point estimate belongs to "purchase-history heuristic", but its interval overlaps the learned rule's.
 
-## Methods ladder
+## Methods
 
-| step | file | what it establishes |
+| step | file | what it does |
 |---|---|---|
-| 1. Naive diff-in-means | `src/naive.py` | estimates the randomized assignment effect; measured balance is a descriptive check |
-| 2. Regression baseline | `src/regression_baseline.py` | adjusted logit prediction contrasts / OLS with HC1 uncertainty |
-| 3. DoWhy identification | `src/identify.py` | derives the empty backdoor set under the randomized-design graph |
-| 4. LinearDML | `src/dml_ate.py` | pooled and creative-specific average effects with cross-fitted nuisances |
-| 5. Selection diagnostics | `src/confounded.py` | compares selected-sample estimates with a full-RCT estimate for another population |
-| 6. CausalForestDML | `src/cate.py` | exploratory profile-level conditional average effects |
-| 7. Qini / uplift | `src/uplift.py` | evaluates whether the model ranking beats random targeting |
-| 8. Three-arm policy | `src/policy.py` | evaluates learned, heuristic, and blanket actions |
-| 9. Refutation | `src/refute.py` | diagnostics for responses to particular perturbations, not correctness certificates |
+| 1. Difference in means | `src/naive.py` | compares group averages, which is valid here because assignment was random |
+| 2. Regression | `src/regression_baseline.py` | the same comparison, adjusted for customer details |
+| 3. DoWhy identification | `src/identify.py` | confirms from the causal graph that no extra controls are needed |
+| 4. LinearDML | `src/dml_ate.py` | the main average effects, overall and for each email |
+| 5. Selection check | `src/confounded.py` | biases the sample on purpose to see how each method reacts |
+| 6. CausalForestDML | `src/cate.py` | predicts the effect for each customer profile (exploratory) |
+| 7. Qini and uplift | `src/uplift.py` | tests whether ranking customers by predicted effect beats random order |
+| 8. Choosing an email | `src/policy.py` | compares the learned rule with the simple rules |
+| 9. Refutation | `src/refute.py` | checks how estimates react to fake treatments, random noise and smaller samples |
+
+Passing the refutation checks can expose problems. It does not prove an estimate is correct.
 
 ## How to run it
 
@@ -61,33 +65,32 @@ py -3.12 -m venv .venv
 .venv\Scripts\python.exe -m streamlit run app/simulator.py
 ```
 
-On macOS or Linux, use `.venv/bin/python` in place of the Windows path. The committed manifest
-and serving artifacts support the quick start. To rebuild all estimates, figures, reports, model
-artifacts and PDF, run `.venv\Scripts\python.exe -m src.pipeline`. The optional 500-repetition
-synthetic benchmark can be run separately with `-m src.simulation --repetitions 500`.
-`scripts/verify.ps1` runs the pinned-environment quality gate.
+On macOS or Linux, use `.venv/bin/python` instead of the Windows path. The quick start uses the
+model files already in the repo, so nothing needs training first.
 
-## Design decisions and trade-offs
+To rebuild every estimate, figure, report, model file and the PDF, run
+`.venv\Scripts\python.exe -m src.pipeline`. The longer simulation with 500 repetitions runs
+separately with `-m src.simulation --repetitions 500`. `scripts/verify.ps1` runs the dependency
+check, lint and tests.
 
-- **Placebo, random-common-cause and data-subset refuters are implemented by hand** (`src/refute.py`), not via DoWhy's `refute_estimate()` wrapper, because that wrapper's econml integration passes categorical effect-modifier columns straight to econml's numeric `.effect()` without dummy-encoding them and fails with a real `KeyError` on this project's `channel`/`zip_code` columns. Writing the refuters directly against `src/dml_ate.py`'s own estimator also means the *actual* model this project reports stays under test, not a substitute.
-- **Constructed selection is reported as a descriptive diagnostic.** It uses an estimated full-RCT reference, while selection changes the population being analyzed. Differences between those estimates are not known bias for the selected population. Bias and coverage against known targets are evaluated in the fully synthetic Monte Carlo benchmark.
-- **Qini's cumulative gain curve and raw area are computed locally** (`src/uplift.py`). Normalized Qini uses `sklift.metrics.qini_auc_score` and is verified on fixed fixtures.
-- **`CausalForestDML`/`DRPolicyForest` heterogeneity work targets `visit` only.** `conversion` and `spend` have 578 non-zero events total across 64,000 rows, nowhere near enough to split across a forest's leaves without the CATE surface being mostly noise (`reports/data_dictionary.md`).
-- **The production model artifact (`models/causal_forest.joblib`, 34.47MB) is committed to git**, refit on the full 64,000 rows rather than the 70% split used for honest evaluation, since heterogeneity was already validated on held-out data before this refit happens. Under this project's own 50MB threshold for needing a distilled LightGBM surrogate instead, so the real forest ships.
-- **`starlette` is pinned to `0.52.1`** in `requirements.txt`, one release behind Streamlit 1.61.0's own declared range. Starlette shipped a breaking 1.0 release days before this build, and its new ASGI GZip middleware crashes Streamlit's server with a real `TypeError` on the version pip resolves without the pin.
+## Design decisions
 
-## Status
+- I built two biased samples from the real data by dropping customers on purpose rather than at random. In the first, the variables behind the dropping (`recency` and `history`) stay visible to the models. In the second, the driver (`newbie`) is hidden from them. Comparing each method's estimate with the full experiment shows how it reacts in each case (`reports/06_confounding_benchmark.md`). These samples contain different customers from the full experiment, so the gaps are not exact bias measurements. Exact bias and coverage come from a separate simulated dataset where the true effect is known (`reports/07_uplift_policy.md`).
+- DoWhy's own refutation wrapper failed with a `KeyError`. It passes the text columns `channel` and `zip_code` to EconML without converting them to numbers. So `src/refute.py` runs the three checks directly on the same estimator the project reports.
+- The per-customer models only look at visits. Just 578 of the 64,000 customers bought anything, which is too few to split across a forest without the estimates turning into noise (`reports/data_dictionary.md`).
+- The Qini curve and raw area are computed in `src/uplift.py`. The normalised score comes from scikit-uplift's `qini_auc_score` and is checked against fixed test cases.
+- The simulator's model (`models/causal_forest.joblib`, 34.47 MB) is committed to git so Streamlit Cloud can load it without retraining. It is refit on all 64,000 rows. The evaluation numbers above come from earlier fits on part of the data, scored on customers held back from training. I set a 50 MB limit, above which a smaller substitute model would have replaced it.
+- `starlette` is pinned to 0.52.1. Its 1.0 release came out days before this build and crashed Streamlit 1.61.0's server with a `TypeError`.
 
-The average treatment effect is well identified by the randomised design. Targeting
-evidence from this held-out evaluation is summarised below:
+## What this does not show
 
-- The normalized Qini ranking score is 0.0111
-  [-0.0114, 0.0331]. The interval crosses zero, so this analysis does not establish a positive ranking advantage.
-- Learned minus blanket mens emailing is +0.13pp
-  [-0.14pp, +0.40pp]. Held-out evidence does not establish which policy has higher expected visit value. Blanket mens emailing is the simpler action for this experiment; validate any learned policy on another campaign before broader deployment.
+The average effect is solid because the experiment was randomised. The customer ranking may be no better than random order. The learned rule has no clear lead over emailing everyone the mens creative.
 
-Reported spend among the top-30% diagnostic is $0.7816
-[$0.3733, $1.2743], but Hillstrom supplies neither gross margin nor
-uncapped spend. It is therefore a gross-spend sensitivity, not a profit estimate. The experiment
-covers one US retailer in March 2008; its effect sizes do not transfer to a 2026 South African bank
-or telecoms campaign.
+Emailing the top 30% of customers gave reported spend of $0.78 per targeted
+customer, with an interval from $0.37 to $1.27. The data has no
+profit margins, and 12 customers sit at the $499 spend maximum, which may be a cap. So this is not
+a profit figure.
+
+The data comes from one US retailer in March 2008. The method carries over to other campaigns,
+but the effect sizes do not. A South African bank or telecoms campaign in 2026 would need its own
+experiment.

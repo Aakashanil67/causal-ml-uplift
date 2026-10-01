@@ -480,9 +480,9 @@ def render_readme_results(results: dict) -> str:
         "learned (DRPolicyForest) - email everyone (mens creative)"
     ]
     lines = [
-        "Pooled `LinearDML` effects for assignment to either email rather than no email:",
+        'Effect of being sent either email, compared with no email. "pp" means percentage points.',
         "",
-        "| outcome | DML ATE | 95% CI |",
+        "| outcome | estimate (LinearDML) | 95% interval |",
         "|---|---:|---:|",
     ]
     for outcome in ("visit", "conversion", "spend"):
@@ -496,18 +496,19 @@ def render_readme_results(results: dict) -> str:
         lines.append(f"| {outcome} | {effect} | {interval} |")
     lines += [
         "",
-        "The pooled visit effect corresponds to about "
-        f"{pooled['visit']['ate'] * 1000:.0f} additional visits per 1,000 customers assigned email. "
-        "The forest produces varying conditional-effect predictions. "
-        f"Normalized Qini is {qini['value']:.4f} "
-        f"[{qini['ci_low']:.4f}, {qini['ci_high']:.4f}]; across five honest splits it ranges "
-        f"from {repeats['min']:.4f} to {repeats['max']:.4f}. "
-        f"{_interval_conclusion(qini['ci_low'], qini['ci_high'], 'a positive ranking advantage')} "
-        "The repository does not claim that individual uplift ordering is deployment-ready.",
+        f"The visit effect works out to about {pooled['visit']['ate'] * 1000:.0f} extra visits "
+        "for every 1,000 customers emailed.",
         "",
-        "Three-action policies are evaluated with cross-fitted doubly robust scores:",
+        "Targeting is the harder part. The Qini score checks whether ranking customers by their "
+        "predicted effect does better than emailing them in random order. It came out at "
+        f"{qini['value']:.4f}, with a 95% interval from {qini['ci_low']:.4f} to "
+        f"{qini['ci_high']:.4f}. {_readme_ranking_sentence(qini)} Over five different train and "
+        f"test splits, the score ranged from {repeats['min']:.4f} to {repeats['max']:.4f}.",
         "",
-        "| policy | expected visit rate | 95% CI |",
+        "I also compared five rules for deciding which email, if any, each customer gets. Each "
+        "rule is scored on customers the model never saw during training:",
+        "",
+        "| rule | expected visit rate | 95% interval |",
         "|---|---:|---:|",
     ]
     for name in (
@@ -523,11 +524,52 @@ def render_readme_results(results: dict) -> str:
         )
     lines += [
         "",
-        f"Learned minus blanket mens is {_effect_pp(comparison['difference'])} "
-        f"{_pp_interval(comparison['ci_low'], comparison['ci_high'])}. "
-        f"{_policy_conclusion(comparison)}",
+        "The learned rule's lead over emailing everyone the mens creative is "
+        f"{_effect_pp(comparison['difference'])}, with an interval from "
+        f"{_pp(comparison['ci_low'])} to {_pp(comparison['ci_high'])}. "
+        f"{_readme_policy_sentence(comparison)} {_readme_top_policy_sentence(policy)}",
     ]
     return "\n".join(lines)
+
+
+def _readme_ranking_sentence(qini: dict) -> str:
+    if _interval_includes_zero(qini["ci_low"], qini["ci_high"]):
+        return "That interval includes zero, so the ranking may be no better than random order."
+    if qini["ci_low"] > 0:
+        return (
+            "The whole interval is positive, so on this data the ranking does better than "
+            "random order."
+        )
+    return "The whole interval is negative, so the ranking does worse than random order."
+
+
+def _readme_policy_sentence(comparison: dict) -> str:
+    if _interval_includes_zero(comparison["ci_low"], comparison["ci_high"]):
+        return (
+            "The data cannot say which of the two is better. Emailing everyone the mens "
+            "creative is simpler and does about as well."
+        )
+    if comparison["ci_low"] > 0:
+        return (
+            "The whole interval is positive, so the learned rule does better on this data. "
+            "It should still be tested on another campaign before wider use."
+        )
+    return (
+        "The whole interval is negative, so emailing everyone the mens creative does better "
+        "than the learned rule."
+    )
+
+
+def _readme_top_policy_sentence(policy: dict) -> str:
+    learned = policy["learned (DRPolicyForest)"]
+    top_name, top = max(policy.items(), key=lambda item: item[1]["value"])
+    if top_name == "learned (DRPolicyForest)":
+        return "The learned rule has the highest point estimate."
+    if top["ci_low"] <= learned["ci_high"]:
+        relation = "but its interval overlaps the learned rule's"
+    else:
+        relation = "and its interval sits entirely above the learned rule's"
+    return f'The highest point estimate belongs to "{top_name}", {relation}.'
 
 
 def render_readme_run() -> str:
@@ -537,11 +579,13 @@ py -3.12 -m venv .venv
 .venv\\Scripts\\python.exe -m streamlit run app/simulator.py
 ```
 
-On macOS or Linux, use `.venv/bin/python` in place of the Windows path. The committed manifest
-and serving artifacts support the quick start. To rebuild all estimates, figures, reports, model
-artifacts and PDF, run `.venv\\Scripts\\python.exe -m src.pipeline`. The optional 500-repetition
-synthetic benchmark can be run separately with `-m src.simulation --repetitions 500`.
-`scripts/verify.ps1` runs the pinned-environment quality gate."""
+On macOS or Linux, use `.venv/bin/python` instead of the Windows path. The quick start uses the
+model files already in the repo, so nothing needs training first.
+
+To rebuild every estimate, figure, report, model file and the PDF, run
+`.venv\\Scripts\\python.exe -m src.pipeline`. The longer simulation with 500 repetitions runs
+separately with `-m src.simulation --repetitions 500`. `scripts/verify.ps1` runs the dependency
+check, lint and tests."""
 
 
 def render_readme_status(results: dict) -> str:
@@ -550,19 +594,31 @@ def render_readme_status(results: dict) -> str:
     comparison = _table_by(results["policy"]["comparisons"], "comparison")[
         "learned (DRPolicyForest) - email everyone (mens creative)"
     ]
-    return f"""The average treatment effect is well identified by the randomised design. Targeting
-evidence from this held-out evaluation is summarised below:
+    if _interval_includes_zero(qini["ci_low"], qini["ci_high"]):
+        ranking = "The customer ranking may be no better than random order."
+    elif qini["ci_low"] > 0:
+        ranking = "The customer ranking beats random order, with an entirely positive interval."
+    else:
+        ranking = "The customer ranking does worse than random order."
+    if _interval_includes_zero(comparison["ci_low"], comparison["ci_high"]):
+        policy = "The learned rule has no clear lead over emailing everyone the mens creative."
+    elif comparison["ci_low"] > 0:
+        policy = (
+            "The learned rule has a positive lead over emailing everyone the mens creative, "
+            "which should be checked on another campaign."
+        )
+    else:
+        policy = "Emailing everyone the mens creative beats the learned rule."
+    return f"""The average effect is solid because the experiment was randomised. {ranking} {policy}
 
-- The normalized Qini ranking score is {qini["value"]:.4f}
-  [{qini["ci_low"]:.4f}, {qini["ci_high"]:.4f}]. {_interval_conclusion(qini["ci_low"], qini["ci_high"], "a positive ranking advantage")}
-- Learned minus blanket mens emailing is {_effect_pp(comparison["difference"])}
-  {_pp_interval(comparison["ci_low"], comparison["ci_high"])}. {_policy_conclusion(comparison)}
+Emailing the top 30% of customers gave reported spend of ${spend["value"]:.2f} per targeted
+customer, with an interval from ${spend["ci_low"]:.2f} to ${spend["ci_high"]:.2f}. The data has no
+profit margins, and 12 customers sit at the $499 spend maximum, which may be a cap. So this is not
+a profit figure.
 
-Reported spend among the top-30% diagnostic is ${spend["value"]:.4f}
-[${spend["ci_low"]:.4f}, ${spend["ci_high"]:.4f}], but Hillstrom supplies neither gross margin nor
-uncapped spend. It is therefore a gross-spend sensitivity, not a profit estimate. The experiment
-covers one US retailer in March 2008; its effect sizes do not transfer to a 2026 South African bank
-or telecoms campaign."""
+The data comes from one US retailer in March 2008. The method carries over to other campaigns,
+but the effect sizes do not. A South African bank or telecoms campaign in 2026 would need its own
+experiment."""
 
 
 def render_uplift_report(results: dict) -> str:
@@ -1061,7 +1117,9 @@ def _rendered_outputs(results: dict) -> dict[Path, str]:
     readme = README_PATH.read_text(encoding="utf-8")
     readme = replace_markdown_section(readme, "## Results", render_readme_results(results))
     readme = replace_markdown_section(readme, "## How to run it", render_readme_run())
-    readme = replace_markdown_section(readme, "## Status", render_readme_status(results))
+    readme = replace_markdown_section(
+        readme, "## What this does not show", render_readme_status(results)
+    )
     report = _clean_causal_report_template(CAUSAL_REPORT_TEMPLATE_PATH.read_text(encoding="utf-8"))
     report = replace_markdown_section(
         report,
