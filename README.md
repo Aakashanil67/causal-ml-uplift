@@ -69,9 +69,10 @@ On macOS or Linux, use `.venv/bin/python` instead of the Windows path. The quick
 model files already in the repo, so nothing needs training first.
 
 To rebuild every estimate, figure, report, model file and the PDF, run
-`.venv\Scripts\python.exe -m src.pipeline`. The longer simulation with 500 repetitions runs
-separately with `-m src.simulation --repetitions 500`. `scripts/verify.ps1` runs the dependency
-check, lint and tests.
+`.venv\Scripts\python.exe -m src.pipeline`. This includes the simulation with 500 repetitions,
+so it takes a while. To run only the simulation and print its results, use
+`-m src.simulation --repetitions 500`. `scripts/verify.ps1` runs the dependency check, lint and
+tests.
 
 ## Design decisions
 
