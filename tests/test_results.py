@@ -63,7 +63,11 @@ def valid_results():
             "normalized_qini": {"value": 0.02, "ci_low": -0.01, "ci_high": 0.05},
             "repeated_summary": {"mean": 0.02, "std": 0.01, "min": -0.01, "max": 0.05},
             "repeated_splits": [],
-            "top_k": [],
+            "top_k": [
+                {"k": 0.1, "value": 0.02, "ci_low": 0.0, "ci_high": 0.04},
+                {"k": 0.2, "value": 0.02, "ci_low": 0.0, "ci_high": 0.04},
+                {"k": 0.3, "value": 0.02, "ci_low": 0.0, "ci_high": 0.04},
+            ],
             "deciles": [],
             "forest_sensitivity": [],
             "gross_spend_top_30": {"value": 0.5, "ci_low": 0.1, "ci_high": 0.9},
@@ -231,6 +235,18 @@ def test_results_rejects_non_numeric_nested_ranking_value(valid_results):
     valid_results["ranking"]["normalized_qini"]["value"] = "0.02"
 
     with pytest.raises(ValueError, match="ranking.normalized_qini.value.*number"):
+        validate_results(valid_results)
+
+
+def test_results_reject_too_few_top_k_rows(valid_results):
+    valid_results["ranking"]["top_k"] = valid_results["ranking"]["top_k"][:2]
+
+    with pytest.raises(ValueError, match="ranking.top_k must have at least 3 rows"):
+        validate_results(valid_results)
+
+    valid_results["ranking"]["top_k"] = []
+
+    with pytest.raises(ValueError, match="ranking.top_k must have at least 3 rows"):
         validate_results(valid_results)
 
 

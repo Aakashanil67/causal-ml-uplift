@@ -20,6 +20,8 @@ from src.config import (
 )
 
 RESULTS_SCHEMA_VERSION = 3
+# The renderers read the third row (top 30 percent) directly.
+MIN_TOP_K_ROWS = 3
 REQUIRED_SECTIONS = {
     "metadata",
     "headline",
@@ -305,6 +307,8 @@ def validate_results(results: dict) -> None:
         if key not in ranking:
             raise ValueError(f"Results field ranking.{key} is required.")
         _require_record_fields(ranking[key], f"ranking.{key}", fields)
+    if len(ranking["top_k"]) < MIN_TOP_K_ROWS:
+        raise ValueError(f"Results field ranking.top_k must have at least {MIN_TOP_K_ROWS} rows.")
     _require_record_fields(
         ranking["repeated_splits"],
         "ranking.repeated_splits",
